@@ -1,6 +1,7 @@
 import { defineRouter } from '#q-app/wrappers'
 import { createRouter, createMemoryHistory, createWebHistory, createWebHashHistory } from 'vue-router'
 import routes from './routes'
+import { useAuthStore } from '../stores/auth'
 
 /*
  * If not building with SSR mode, you can
@@ -11,7 +12,7 @@ import routes from './routes'
  * with the Router instance.
  */
 
-export default defineRouter(function (/* { store, ssrContext } */) {
+export default defineRouter(function ({ store /*, ssrContext */ }) {
   const createHistory = process.env.SERVER
     ? createMemoryHistory
     : (process.env.VUE_ROUTER_MODE === 'history' ? createWebHistory : createWebHashHistory)
@@ -24,6 +25,28 @@ export default defineRouter(function (/* { store, ssrContext } */) {
     // quasar.conf.js -> build -> vueRouterMode
     // quasar.conf.js -> build -> publicPath
     history: createHistory(process.env.VUE_ROUTER_BASE)
+  })
+
+  // Navigation Guard
+  Router.beforeEach(async (to) => {
+    const authStore = useAuthStore(store)
+    
+    // Wait for auth to initialize
+    if (authStore.loading) {
+      await authStore.initAuth()
+    }
+
+    const isAuthenticated = authStore.isAuthenticated
+
+    if (to.meta.requiresAuth && !isAuthenticated) {
+      // Redirect to login
+      return { path: '/login', query: { redirect: to.fullPath } }
+    } else if (to.meta.guestOnly && isAuthenticated) {
+      // Redirect to home if already logged in
+      return { path: '/' }
+    }
+    
+    return true // Continue navigation
   })
 
   return Router
