@@ -1,17 +1,44 @@
 <template>
   <q-page padding class="bg-grey-1">
-    <div class="text-h4 q-mb-md">Marketing Department</div>
+    <div class="row items-center q-mb-md">
+      <div class="text-h4">Marketing Department</div>
+      <q-space />
+      <div class="bg-grey-3 q-pa-sm rounded-borders">
+        <div class="text-caption text-grey-7">Global Monthly Budget</div>
+        <div class="text-h6 text-deep-orange-9">${{ marketingStore.totalMonthlyMarketingCost.toLocaleString() }}</div>
+      </div>
+    </div>
+
+    <!-- Territory Selection -->
+    <q-tabs
+      v-model="selectedTerritoryId"
+      dense
+      class="text-grey q-mb-md"
+      active-color="deep-orange-9"
+      indicator-color="deep-orange-9"
+      align="left"
+      narrow-indicator
+    >
+      <q-tab 
+        v-for="t in worldStore.territories" 
+        :key="t.id" 
+        :name="t.id" 
+        :label="t.name" 
+        :icon="t.active ? 'public' : 'lock'"
+      />
+    </q-tabs>
 
     <div class="row q-gutter-md">
-      <!-- Brand Status -->
+      <!-- Regional Brand Status -->
       <q-card flat bordered class="col-12 col-md-4">
-        <q-card-section class="bg-deep-orange-9 text-white">
-          <div class="text-h6">Brand Awareness</div>
+        <q-card-section :class="selectedTerritory?.active ? 'bg-deep-orange-9' : 'bg-grey-7'" class="text-white">
+          <div class="text-h6">{{ selectedTerritory?.name }} Awareness</div>
         </q-card-section>
-        <q-card-section class="text-center q-pa-lg">
+        
+        <q-card-section v-if="selectedTerritory?.active" class="text-center q-pa-lg">
           <q-knob
             readonly
-            v-model="marketingStore.brandAwareness"
+            :model-value="marketingStore.getAwareness(selectedTerritoryId)"
             show-value
             size="120px"
             :thickness="0.22"
@@ -19,33 +46,43 @@
             track-color="grey-3"
             class="text-deep-orange q-ma-md"
           >
-            {{ Math.floor(marketingStore.brandAwareness) }}%
+            {{ Math.floor(marketingStore.getAwareness(selectedTerritoryId)) }}%
           </q-knob>
-          <div class="text-subtitle1 text-grey-8">Global Market Recognition</div>
+          <div class="text-subtitle1 text-grey-8">Regional Recognition</div>
           <p class="text-caption text-grey-6 q-mt-sm">
-            Higher awareness naturally increases demand for all your models. 
-            Keep marketing active to prevent brand decay.
+            Awareness in {{ selectedTerritory?.name }} influences demand for all models sold here.
+            Run regional campaigns to build and maintain this score.
           </p>
+        </q-card-section>
+        <q-card-section v-else class="text-center q-pa-xl">
+          <q-icon name="lock" size="64px" color="grey-4" />
+          <div class="text-h6 text-grey-6">Market Locked</div>
+          <p class="text-grey">Expand to this territory in the Manager's Office to begin marketing.</p>
         </q-card-section>
         
         <q-separator />
         
-        <q-card-section class="bg-grey-2">
+        <q-card-section v-if="selectedTerritory?.active" class="bg-grey-2">
            <div class="row justify-between items-center">
-             <div class="text-subtitle2">Total Monthly Budget:</div>
-             <div class="text-h6 text-deep-orange-9">${{ marketingStore.totalMonthlyMarketingCost.toLocaleString() }}</div>
+             <div class="text-subtitle2">Regional Budget:</div>
+             <div class="text-h6 text-deep-orange-9">${{ marketingStore.getTerritoryMarketingCost(selectedTerritoryId).toLocaleString() }}</div>
            </div>
         </q-card-section>
       </q-card>
 
-      <!-- Model Campaigns -->
+      <!-- Regional Model Campaigns -->
       <q-card flat bordered class="col-12 col-md-7">
-        <q-card-section class="bg-blue-grey-9 text-white">
-          <div class="text-h6">Model Specific Campaigns</div>
+        <q-card-section class="bg-blue-grey-9 text-white row items-center">
+          <div class="text-h6">Localized Campaigns: {{ selectedTerritory?.name }}</div>
+          <q-space />
+          <q-badge color="indigo" label="Market Specific" />
         </q-card-section>
         
         <q-card-section>
-          <div v-if="designStore.models.length === 0" class="text-center q-pa-xl text-grey">
+          <div v-if="!selectedTerritory?.active" class="text-center q-pa-xl text-grey italic">
+            Marketing actions unavailable for locked territories.
+          </div>
+          <div v-else-if="designStore.models.length === 0" class="text-center q-pa-xl text-grey">
             No vehicle models available to market.
           </div>
           <q-list v-else separator>
@@ -56,19 +93,19 @@
 
               <q-item-section>
                 <q-item-label class="text-h6">{{ model.name }}</q-item-label>
-                <q-item-label caption>Launched in {{ model.introduced }}</q-item-label>
+                <q-item-label caption>Current Regional Awareness: {{ Math.floor(marketingStore.getAwareness(selectedTerritoryId)) }}%</q-item-label>
               </q-item-section>
 
               <q-item-section side style="width: 250px">
                 <q-select
-                  :model-value="marketingStore.activeCampaigns[model.id]?.id"
-                  @update:model-value="(val) => marketingStore.setCampaign(model.id, val)"
+                  :model-value="marketingStore.activeRegionalCampaigns[selectedTerritoryId]?.[model.id]?.id"
+                  @update:model-value="(val) => marketingStore.setCampaign(selectedTerritoryId, model.id, val)"
                   :options="availableMedia"
                   option-label="name"
                   option-value="id"
                   map-options
                   emit-value
-                  label="Select Media"
+                  label="Select Local Media"
                   outlined
                   dense
                   clearable
@@ -84,8 +121,8 @@
                 </q-select>
               </q-item-section>
 
-              <q-item-section side v-if="marketingStore.activeCampaigns[model.id]">
-                 <q-badge color="deep-orange" label="BOOST ACTIVE" />
+              <q-item-section side v-if="marketingStore.activeRegionalCampaigns[selectedTerritoryId]?.[model.id]">
+                 <q-badge color="deep-orange" label="LOCAL BOOST" />
               </q-item-section>
             </q-item>
           </q-list>
@@ -123,14 +160,22 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useMarketingStore } from '../stores/marketing'
 import { useDesignStore } from '../stores/design'
 import { useGameStore } from '../stores/game'
+import { useWorldStore } from '../stores/world'
 
 const marketingStore = useMarketingStore()
 const designStore = useDesignStore()
 const gameStore = useGameStore()
+const worldStore = useWorldStore()
+
+const selectedTerritoryId = ref('north-america')
+
+const selectedTerritory = computed(() => {
+  return worldStore.territories.find(t => t.id === selectedTerritoryId.value)
+})
 
 const availableMedia = computed(() => {
   return marketingStore.mediaTypes.filter(m => gameStore.year >= m.minYear)

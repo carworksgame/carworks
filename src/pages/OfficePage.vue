@@ -159,7 +159,7 @@
           <q-card v-for="factory in playerStore.factories" :key="factory.id" flat bordered class="col-12 col-md-4">
             <q-card-section class="bg-blue-grey-8 text-white">
               <div class="text-h6">{{ factory.location }} Factory</div>
-              <div class="text-caption">{{ formatTerritoryName(factory.territory) }}</div>
+              <div class="text-caption">{{ formatTerritoryName(factory.territory) }} • Level {{ factory.level }}</div>
             </q-card-section>
 
             <q-card-section>
@@ -185,11 +185,36 @@
                 </div>
               </div>
 
-              <div class="q-mb-xs text-caption">Production Productivity</div>
-              <q-linear-progress :value="playerStore.getFactoryProductivity(factory.id) / 1.5" :color="getSatisfactionColor(playerStore.getFactorySatisfaction(factory.id))" size="10px" rounded />
-              
-              <div class="text-caption text-grey q-mt-sm">
-                Output: {{ (factory.employees * playerStore.getFactoryProductivity(factory.id)).toFixed(0) }} units / month
+              <div class="q-mb-sm">
+                <div class="text-caption">Automation & Output</div>
+                <q-linear-progress :value="playerStore.getFactoryProductivity(factory.id) / 2.0" :color="getSatisfactionColor(playerStore.getFactorySatisfaction(factory.id))" size="10px" rounded />
+                <div class="row justify-between text-caption text-grey-7 q-mt-xs">
+                   <span>Unit Cost: -{{ (factory.level - 1) * 5 }}%</span>
+                   <span class="text-weight-bold">Output: {{ (factory.employees * playerStore.getFactoryProductivity(factory.id)).toFixed(0) }} units</span>
+                </div>
+              </div>
+
+              <q-separator class="q-my-sm" />
+
+              <div v-if="factory.level < 5">
+                <q-btn 
+                  color="indigo-10" 
+                  class="full-width" 
+                  label="Modernize Factory" 
+                  icon="precision_manufacturing"
+                  :disabled="playerStore.funds < playerStore.getUpgradeCost(factory.level)"
+                  @click="modernizeFactory(factory)"
+                >
+                  <q-tooltip>
+                    Upgrade to Level {{ factory.level + 1 }}. Cost: ${{ playerStore.getUpgradeCost(factory.level).toLocaleString() }}
+                  </q-tooltip>
+                </q-btn>
+                <div class="text-center text-caption text-indigo-9 q-mt-xs">
+                  Next Level: ${{ playerStore.getUpgradeCost(factory.level).toLocaleString() }}
+                </div>
+              </div>
+              <div v-else class="text-center text-positive text-weight-bold text-overline">
+                FULLY MODERNIZED (MAX LEVEL)
               </div>
             </q-card-section>
           </q-card>
@@ -506,6 +531,20 @@ function buildFactory() {
   } else {
     $q.notify({ color: 'negative', message: 'Insufficient funds for factory construction.' })
   }
+}
+
+function modernizeFactory(factory) {
+  const cost = playerStore.getUpgradeCost(factory.level)
+  $q.dialog({
+    title: 'Modernize Factory',
+    message: `Are you sure you want to upgrade the ${factory.location} factory to Level ${factory.level + 1}? Cost: $${cost.toLocaleString()}`,
+    cancel: true,
+    persistent: true
+  }).onOk(() => {
+    if (playerStore.upgradeFactory(factory.id)) {
+      $q.notify({ color: 'positive', message: 'Modernization complete!', icon: 'precision_manufacturing' })
+    }
+  })
 }
 
 async function resetGame() {

@@ -33,7 +33,7 @@ export function processEndTurn() {
   const originalProgressPerTech = researchStore.progressPerTech
   researchStore.progressPerTech = originalProgressPerTech * techProd
   researchStore.progressResearch()
-  researchStore.progressPerTech = originalProgressPerTech // Reset for next calculations
+  researchStore.progressPerTech = originalProgressPerTech // Reset
 
   marketingStore.processMonthlyBrandGrowth()
 
@@ -54,6 +54,7 @@ export function processEndTurn() {
     }
 
     factoryAggregator[f.id] = {
+      level: f.level,
       capacity: f.employees * playerStore.getFactoryProductivity(f.id) * strikeBonus,
       territory: f.territory,
       requests: [] // { model, salesTerritoryId, volume }
@@ -89,14 +90,10 @@ export function processEndTurn() {
     factory.requests.forEach(req => {
       const actualProduction = Math.floor(req.volume * ratio)
       if (actualProduction > 0) {
-        // Production Cost
-        totalProductionCosts += req.model.cost * actualProduction
-        
-        // Shipping Cost
+        const unitCostDiscount = 1 - ((factory.level - 1) * 0.05)
+        totalProductionCosts += (req.model.cost * unitCostDiscount) * actualProduction
         const shipRate = worldStore.getShippingCost(factory.territory, req.salesTerritoryId)
         totalShippingCosts += actualProduction * shipRate
-
-        // Add to regional inventory
         playerStore.addToInventory(req.model.id, req.salesTerritoryId, actualProduction)
       }
     })
@@ -111,10 +108,14 @@ export function processEndTurn() {
     const totalPotentialDemand = (territory.population / 100000) * territory.wealth * worldStore.globalDemandMultiplier
     const availableModels = []
     
+    // Regional Marketing Info
+    const regAwareness = marketingStore.getAwareness(territory.id)
+
     activeModels.forEach(m => {
       const inventory = playerStore.inventory[m.id]?.[territory.id] || 0
       const config = playerStore.productionConfig[m.id]?.[territory.id] || { price: 0 }
       if (inventory > 0 && config.price > 0) {
+        const modelBoost = marketingStore.getBoostForModel(m.id, territory.id)
         availableModels.push({
           ownerId: 'player',
           modelId: m.id,
@@ -122,7 +123,7 @@ export function processEndTurn() {
           price: config.price,
           stats: m.stats,
           inventory,
-          marketingBoost: marketingStore.getBoostForModel(m.id) * (1 + (marketingStore.brandAwareness / 100))
+          marketingBoost: modelBoost * (1 + (regAwareness / 100))
         })
       }
     })
@@ -136,7 +137,7 @@ export function processEndTurn() {
           price: m.price,
           stats: m.stats,
           inventory: comp.productionLimit,
-          marketingBoost: 1.2
+          marketingBoost: 1.2 // Competitors get a flat boost for now
         })
       })
     })
@@ -159,8 +160,8 @@ export function processEndTurn() {
          safetyWeight = 2.0 
        }
        const perfScore = (m.stats.pwrRatio * perfWeight)
-       const econScore = (m.stats.economy * econWeight)
-       const safetyScore = (m.stats.safety / 5 * safetyWeight)
+       const econScore = (m.stats.realEconomy * econWeight)
+       const safetyScore = (m.stats.realSafety / 5 * safetyWeight)
        const baseScore = perfScore + econScore + safetyScore
        const value = (baseScore / (m.price / 500)) || 1
        return value * m.marketingBoost

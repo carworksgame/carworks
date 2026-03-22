@@ -17,7 +17,7 @@ export const usePlayerStore = defineStore('player', {
     },
 
     factories: [
-      { id: 1, territory: 'north-america', size: 1, employees: 100, salary: 1550, maxEmployees: 500, location: 'Detroit' }
+      { id: 1, territory: 'north-america', size: 1, level: 1, employees: 100, salary: 1550, maxEmployees: 500, location: 'Detroit' }
     ],
     showrooms: [
       { id: 1, territory: 'north-america', salesForce: 10, monthlyLease: 500 }
@@ -42,8 +42,6 @@ export const usePlayerStore = defineStore('player', {
       const factorySalaries = state.factories.reduce((acc, f) => acc + (f.employees * f.salary), 0)
       const technicianSalaries = state.technicians * state.salaryPerTechnician
       const basePayroll = factorySalaries + technicianSalaries
-      
-      // Benefits cost: at 100% benefits, cost is +20% of payroll
       const benefitsCost = basePayroll * (state.benefitsLevel / 100) * 0.2
       return basePayroll + benefitsCost
     },
@@ -60,22 +58,24 @@ export const usePlayerStore = defineStore('player', {
       const territory = worldStore.territories.find(t => t.id === factory.territory)
       const baseWage = territory?.baseWage || 1500
       
-      // Satisfaction = (Salary / BaseWage) + (Benefits bonus)
-      // benefitsLevel 100 gives a +0.2 boost
       const ratio = factory.salary / baseWage
       const benefitBonus = (state.benefitsLevel / 100) * 0.2
       return ratio + benefitBonus
     },
 
     getFactoryProductivity: (state) => (factoryId) => {
+      const factory = state.factories.find(f => f.id === factoryId)
+      if (!factory) return 0
       const satisfaction = state.getFactorySatisfaction(factoryId)
-      // Productivity curve: 1.0 at 1.0 satisfaction, 0.5 at 0.5 satisfaction, capped at 1.5
-      return Math.min(1.5, Math.max(0.1, satisfaction))
+      const baseProd = Math.min(1.5, Math.max(0.1, satisfaction))
+      
+      // Level bonus: 25% boost per level above 1
+      const levelBonus = 1 + (factory.level - 1) * 0.25
+      return baseProd * levelBonus
     },
 
     getTechnicianSatisfaction: (state) => {
       const worldStore = useWorldStore()
-      // Technicians are global but compared against North American (HQ) base wage
       const baseWage = worldStore.territories.find(t => t.id === 'north-america')?.baseWage || 1500
       const ratio = state.salaryPerTechnician / baseWage
       const benefitBonus = (state.benefitsLevel / 100) * 0.2
@@ -93,6 +93,16 @@ export const usePlayerStore = defineStore('player', {
     },
     getInventory: (state) => (modelId, territoryId) => {
       return state.inventory[modelId]?.[territoryId] || 0
+    },
+
+    getUpgradeCost: () => (currentLevel) => {
+      const costs = {
+        1: 50000,
+        2: 125000,
+        3: 300000,
+        4: 750000
+      }
+      return costs[currentLevel] || 0
     }
   },
 
@@ -153,7 +163,6 @@ export const usePlayerStore = defineStore('player', {
         this.funds -= territory.unlockCost
         worldStore.unlockTerritory(territory.id)
         
-        // Automatically add a showroom in the new territory
         this.showrooms.push({
           id: Date.now(),
           territory: territory.id,
@@ -161,7 +170,6 @@ export const usePlayerStore = defineStore('player', {
           monthlyLease: 1000
         })
 
-        // Set default supply line to the first factory
         if (this.factories.length > 0) {
           this.supplyLines[territory.id] = this.factories[0].id
         }
@@ -179,8 +187,9 @@ export const usePlayerStore = defineStore('player', {
           id: Date.now(),
           territory: territoryId,
           size: 1,
+          level: 1,
           employees: 50,
-          salary: 1550, // Match start salary
+          salary: 1550, 
           maxEmployees: 500,
           location: locationName
         })
@@ -199,6 +208,19 @@ export const usePlayerStore = defineStore('player', {
 
     updateBenefits(level) {
       this.benefitsLevel = Math.min(100, Math.max(0, level))
+    },
+
+    upgradeFactory(factoryId) {
+      const factory = this.factories.find(f => f.id === factoryId)
+      if (!factory || factory.level >= 5) return false
+      
+      const cost = this.getUpgradeCost(factory.level)
+      if (this.funds >= cost) {
+        this.funds -= cost
+        factory.level++
+        return true
+      }
+      return false
     }
   }
 })
