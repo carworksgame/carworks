@@ -14,6 +14,7 @@ export const useDesignStore = defineStore('design', {
   state: () => ({
     models: [],
     activePrototype: null, // { name, vehicleClass, components, baseStats, status, results: {} }
+    activeIssues: [], // { id, modelId, modelName, territoryId, territoryName, type, costToFix }
     // Component libraries (Base costs in 1908 dollars)
     components: {
       chassis: [
@@ -54,6 +55,11 @@ export const useDesignStore = defineStore('design', {
         { id: 'air-conditioning', name: 'Air Conditioning', cost: 2500, safety: 0, weight: 80, requires: 'air-conditioning' },
         { id: 'navigation-system', name: 'Navigation', cost: 5000, safety: 0, weight: 20, requires: 'navigation-system' },
       ]
+    },
+    durabilityMatrix: {
+      'basic-chassis': 20,
+      'steel-frame': 60,
+      'aerodynamic-body': 50
     }
   }),
 
@@ -63,15 +69,11 @@ export const useDesignStore = defineStore('design', {
     getUnlockedComponents: (state) => (unlockedTech) => {
       const worldStore = useWorldStore()
       const inflation = worldStore.inflationMultiplier
-      
       const filtered = {}
       for (const cat in state.components) {
         filtered[cat] = state.components[cat]
           .filter(comp => !comp.requires || unlockedTech.includes(comp.requires))
-          .map(comp => ({
-            ...comp,
-            cost: Math.round(comp.cost * inflation) // Apply inflation to base cost
-          }))
+          .map(comp => ({ ...comp, cost: Math.round(comp.cost * inflation) }))
       }
       return filtered
     }
@@ -82,12 +84,7 @@ export const useDesignStore = defineStore('design', {
       this.activePrototype = {
         ...design,
         status: 'draft',
-        results: {
-          acceleration: null,
-          braking: null,
-          economy: null,
-          safety: null
-        }
+        results: { acceleration: null, braking: null, economy: null, safety: null }
       }
     },
 
@@ -107,34 +104,26 @@ export const useDesignStore = defineStore('design', {
       const testFee = Math.round(500 * useWorldStore().inflationMultiplier)
       if (playerStore.funds < testFee) return false
       playerStore.funds -= testFee
-
       const variance = 0.85 + (Math.random() * 0.3)
       const base = this.activePrototype.stats
-
-      if (testId === 'acceleration') {
-        this.activePrototype.results.acceleration = (20 / (base.pwrRatio / 10 || 1)) * variance
-      } else if (testId === 'braking') {
-        this.activePrototype.results.braking = (200 / (base.safety / 20 || 1)) * variance
-      } else if (testId === 'economy') {
-        this.activePrototype.results.economy = base.economy * variance
-      } else if (testId === 'safety') {
-        this.activePrototype.results.safety = Math.min(100, base.safety * variance)
-      }
+      if (testId === 'acceleration') this.activePrototype.results.acceleration = (20 / (base.pwrRatio / 10 || 1)) * variance
+      else if (testId === 'braking') this.activePrototype.results.braking = (200 / (base.safety / 20 || 1)) * variance
+      else if (testId === 'economy') this.activePrototype.results.economy = base.economy * variance
+      else if (testId === 'safety') this.activePrototype.results.safety = Math.min(100, base.safety * variance)
       return true
     },
 
     finalizePrototype() {
       if (!this.activePrototype) return
       const gameStore = useGameStore()
-      
       const finalStats = {
         ...this.activePrototype.stats,
         realEconomy: this.activePrototype.results.economy || this.activePrototype.stats.economy,
         realSafety: this.activePrototype.results.safety || this.activePrototype.stats.safety,
         realAcceleration: this.activePrototype.results.acceleration || 0,
-        realBraking: this.activePrototype.results.braking || 0
+        realBraking: this.activePrototype.results.braking || 0,
+        durability: this.durabilityMatrix[this.activePrototype.components.chassis] || 30
       }
-
       this.models.push({
         name: this.activePrototype.name,
         vehicleClass: this.activePrototype.vehicleClass,
@@ -148,17 +137,34 @@ export const useDesignStore = defineStore('design', {
       this.activePrototype = null
     },
 
-    scrapPrototype() {
-      this.activePrototype = null
+    scrapPrototype() { this.activePrototype = null },
+
+    resolveIssue(issueId) {
+      const playerStore = usePlayerStore()
+      const issue = this.activeIssues.find(i => i.id === issueId)
+      if (issue && playerStore.funds >= issue.costToFix) {
+        playerStore.funds -= issue.costToFix
+        this.activeIssues = this.activeIssues.filter(i => i.id !== issueId)
+        return { success: true, cost: issue.costToFix }
+      }
+      return { success: false }
     },
 
-    saveModel(model) {
-      const gameStore = useGameStore()
-      this.models.push({
-        ...model,
-        vehicleClass: model.vehicleClass || VEHICLE_CLASSES.UTILITY,
-        id: Date.now(),
-        introduced: gameStore.year
+    ignoreIssue(issueId) {
+      const playerStore = usePlayerStore()
+      const issue = this.activeIssues.find(i => i.id === issueId)
+      if (issue) {
+        playerStore.changeReputation(-15) // Massive trust hit
+        this.activeIssues = this.activeIssues.filter(i => i.id !== issueId)
+        return true
+      }
+      return false
+    },
+
+    addIssue(issue) {
+      this.activeIssues.push({
+        id: Date.now() + Math.random(),
+        ...issue
       })
     }
   }

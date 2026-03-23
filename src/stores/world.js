@@ -5,9 +5,9 @@ export const useWorldStore = defineStore('world', {
     economicClimate: 1.0,
     globalDemandMultiplier: 1.0,
     activeEvents: [],
-    inflationMultiplier: 1.0, // Starting point in 1908
+    inflationMultiplier: 1.0, 
     territories: [
-      { id: 'north-america', name: 'North America', population: 92000000, wealth: 1.2, active: true, baseWage: 50 }, // Normalized to 1908 monthly
+      { id: 'north-america', name: 'North America', population: 92000000, wealth: 1.2, active: true, baseWage: 50 },
       { id: 'europe', name: 'Europe', population: 400000000, wealth: 1.0, active: false, unlockCost: 50000, baseWage: 45 },
       { id: 'south-america', name: 'South America', population: 40000000, wealth: 0.5, active: false, unlockCost: 30000, baseWage: 20 },
       { id: 'asia', name: 'Asia', population: 900000000, wealth: 0.3, active: false, unlockCost: 75000, baseWage: 15 },
@@ -19,14 +19,15 @@ export const useWorldStore = defineStore('world', {
       'south-america': { 'north-america': 100, 'europe': 180, 'south-america': 0, 'asia': 300 },
       'asia': { 'north-america': 250, 'europe': 120, 'south-america': 300, 'asia': 0 }
     },
+    upcomingExpos: [], // { name, territoryId, dateString, month, year }
+    participatingModelId: null,
+
     historicalEvents: [
       { year: 1914, month: 6, title: 'WWI Begins', type: 'crisis', climate: 0.7 },
       { year: 1918, month: 10, title: 'WWI Ends', type: 'recovery', climate: 1.1 },
       { year: 1929, month: 9, title: 'Great Depression', type: 'crisis', climate: 0.3 },
       { year: 1939, month: 8, title: 'WWII Begins', type: 'crisis', climate: 0.5 },
       { year: 1945, month: 8, title: 'WWII Ends', type: 'recovery', climate: 1.3 },
-      
-      // POST-WAR ERA
       { year: 1950, month: 1, title: 'Post-War Boom', type: 'boom', climate: 1.4 },
       { year: 1955, month: 5, title: 'Interstate Act', type: 'growth', climate: 1.2 },
       { year: 1965, month: 10, title: 'The Muscle Car Era', type: 'boom', climate: 1.1 },
@@ -51,16 +52,13 @@ export const useWorldStore = defineStore('world', {
         if (this.activeEvents.length > 5) this.activeEvents.shift()
       }
       
-      // Annual inflation and wage growth
-      if (currentMonth === 0) { // Every January
+      if (currentMonth === 0) {
         this.territories.forEach(t => {
-          t.baseWage = Math.round(t.baseWage * 1.04) // 4% wage growth
+          t.baseWage = Math.round(t.baseWage * 1.04)
         })
-        // Global inflation: costs rise by ~3.5% annually
         this.inflationMultiplier *= 1.035
       }
 
-      // Random slight fluctuations in demand
       this.globalDemandMultiplier = this.economicClimate * (0.95 + Math.random() * 0.1)
       return event
     },
@@ -74,6 +72,19 @@ export const useWorldStore = defineStore('world', {
 
     getShippingCost(fromId, toId) {
       return this.shippingRates[fromId]?.[toId] ?? 500
+    },
+
+    scheduleExpo(name, territoryId, year, month) {
+      this.upcomingExpos.push({ name, territoryId, year, month })
+    },
+
+    participateInExpo(modelId) {
+      this.participatingModelId = modelId
+    },
+
+    clearExpos() {
+      this.upcomingExpos = []
+      this.participatingModelId = null
     }
   }
 })

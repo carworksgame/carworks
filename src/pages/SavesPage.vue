@@ -34,11 +34,11 @@
             <q-card-section>
               <div class="row justify-between q-mb-xs">
                 <span class="text-grey-7">Current Year:</span>
-                <span class="text-weight-bold">{{ save.gameState.year }}</span>
+                <span class="text-weight-bold">{{ save.gameState?.year || 1908 }}</span>
               </div>
               <div class="row justify-between q-mb-xs">
                 <span class="text-grey-7">Funds:</span>
-                <span class="text-weight-bold text-green-9">${{ save.playerState.funds.toLocaleString() }}</span>
+                <span class="text-weight-bold text-green-9">${{ save.playerState?.funds?.toLocaleString() || 0 }}</span>
               </div>
               <div class="row justify-between text-caption text-grey-6">
                 <span>Last Saved:</span>
@@ -123,6 +123,8 @@ import { useDesignStore } from '../stores/design'
 import { useMarketingStore } from '../stores/marketing'
 import { useCompetitorStore } from '../stores/competitors'
 import { useBankStore } from '../stores/bank'
+import { useReportsStore } from '../stores/reports'
+import { useDebugStore } from '../stores/debug'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 
@@ -135,6 +137,8 @@ const designStore = useDesignStore()
 const marketingStore = useMarketingStore()
 const competitorStore = useCompetitorStore()
 const bankStore = useBankStore()
+const reportsStore = useReportsStore()
+const debugStore = useDebugStore()
 const router = useRouter()
 const $q = useQuasar()
 
@@ -174,7 +178,7 @@ async function startNewGame() {
 
   isStartingNew.value = true
 
-  // Reset all game stores to initial state
+  // Reset all game stores
   gameStore.$reset()
   playerStore.$reset()
   worldStore.$reset()
@@ -183,15 +187,16 @@ async function startNewGame() {
   marketingStore.$reset()
   competitorStore.$reset()
   bankStore.$reset()
+  
+  // Specifically clear reports and debug math
+  reportsStore.clearReports()
+  debugStore.setSnapshot(null)
 
-  // Set identity
   const slotId = 'slot-' + Date.now()
   gameStore.setSlot(slotId)
   playerStore.companyName = newCompanyName.value
 
-  // Perform initial cloud save to reserve the slot
   const result = await savesStore.saveGame(slotId, playerStore.companyName)
-  
   isStartingNew.value = false
   
   if (result.success) {

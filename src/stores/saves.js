@@ -10,6 +10,8 @@ import { useDesignStore } from './design'
 import { useMarketingStore } from './marketing'
 import { useCompetitorStore } from './competitors'
 import { useBankStore } from './bank'
+import { useReportsStore } from './reports'
+import { useDebugStore } from './debug'
 
 export const useSavesStore = defineStore('saves', {
   state: () => ({
@@ -45,7 +47,6 @@ export const useSavesStore = defineStore('saves', {
 
       console.log(`[SAVE] Starting save for slot: ${slotId} (User: ${authStore.userId})...`)
 
-      // Serialize all stores
       const saveData = {
         name: slotName,
         updatedAt: new Date().toISOString(),
@@ -56,16 +57,14 @@ export const useSavesStore = defineStore('saves', {
         designState: { ...useDesignStore().$state },
         marketingState: { ...useMarketingStore().$state },
         competitorState: { ...useCompetitorStore().$state },
-        bankState: { ...useBankStore().$state }
+        bankState: { ...useBankStore().$state },
+        reportsState: { ...useReportsStore().$state },
+        debugState: { ...useDebugStore().$state }
       }
-
-      console.log('[SAVE] Data prepared, sending to Firestore...', saveData)
 
       try {
         const docRef = doc(db, 'users', authStore.userId, 'saves', slotId)
-        console.log('[SAVE] Target document path:', docRef.path)
         await setDoc(docRef, saveData)
-        console.log('[SAVE] Firestore setDoc complete.')
         await this.fetchSaves()
         return { success: true }
       } catch (error) {
@@ -85,7 +84,6 @@ export const useSavesStore = defineStore('saves', {
         if (docSnap.exists()) {
           const data = docSnap.data()
           
-          // Hydrate all stores
           useGameStore().$patch(data.gameState)
           usePlayerStore().$patch(data.playerState)
           useWorldStore().$patch(data.worldState)
@@ -94,6 +92,8 @@ export const useSavesStore = defineStore('saves', {
           useMarketingStore().$patch(data.marketingState)
           useCompetitorStore().$patch(data.competitorState)
           if (data.bankState) useBankStore().$patch(data.bankState)
+          if (data.reportsState) useReportsStore().$patch(data.reportsState)
+          if (data.debugState) useDebugStore().$patch(data.debugState)
           
           return { success: true }
         }

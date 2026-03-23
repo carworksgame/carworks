@@ -5,7 +5,8 @@ export const usePlayerStore = defineStore('player', {
   state: () => ({
     companyName: 'My Car Company',
     funds: 50000,
-    reputation: 10,
+    reputation: 50, // 0-100 scale, starts neutral
+    reputationHistory: [], // Rolling 6 months
     
     // Detailed model management
     productionConfig: {}, // { modelId: { territoryId: { price: 2000, productionVolume: 50 } } }
@@ -17,7 +18,7 @@ export const usePlayerStore = defineStore('player', {
     },
 
     factories: [
-      { id: 1, territory: 'north-america', size: 1, level: 1, employees: 100, salary: 1550, maxEmployees: 500, location: 'Detroit' }
+      { id: 1, territory: 'north-america', size: 1, level: 1, employees: 100, salary: 50, maxEmployees: 500, location: 'Detroit' }
     ],
     showrooms: [
       { id: 1, territory: 'north-america', salesForce: 10, monthlyLease: 500 }
@@ -25,7 +26,7 @@ export const usePlayerStore = defineStore('player', {
 
     // R&D Personnel
     technicians: 0,
-    salaryPerTechnician: 2100,
+    salaryPerTechnician: 60,
 
     // Benefits (Global for company)
     benefitsLevel: 10, // 0-100 scale
@@ -52,15 +53,12 @@ export const usePlayerStore = defineStore('player', {
     monthlyLeaseBill: (state) => state.showrooms.reduce((acc, s) => acc + s.monthlyLease, 0),
     lastMonthPerformance: (state) => state.ledger.length > 0 ? state.ledger[state.ledger.length - 1] : null,
     
-    // Calculate satisfaction based on salary vs regional base wage + benefits
     getFactorySatisfaction: (state) => (factoryId) => {
       const worldStore = useWorldStore()
       const factory = state.factories.find(f => f.id === factoryId)
       if (!factory) return 0
-      
       const territory = worldStore.territories.find(t => t.id === factory.territory)
-      const baseWage = territory?.baseWage || 1500
-      
+      const baseWage = territory?.baseWage || 50
       const ratio = factory.salary / baseWage
       const benefitBonus = (state.benefitsLevel / 100) * 0.2
       return ratio + benefitBonus
@@ -77,7 +75,7 @@ export const usePlayerStore = defineStore('player', {
 
     getTechnicianSatisfaction: (state) => {
       const worldStore = useWorldStore()
-      const baseWage = worldStore.territories.find(t => t.id === 'north-america')?.baseWage || 1500
+      const baseWage = worldStore.territories.find(t => t.id === 'north-america')?.baseWage || 50
       const ratio = state.salaryPerTechnician / baseWage
       const benefitBonus = (state.benefitsLevel / 100) * 0.2
       return ratio + benefitBonus
@@ -88,7 +86,6 @@ export const usePlayerStore = defineStore('player', {
       return Math.min(1.5, Math.max(0.1, satisfaction))
     },
 
-    // Getters for specific model/territory
     getModelConfig: (state) => (modelId, territoryId) => {
       return state.productionConfig[modelId]?.[territoryId] || { price: 0, productionVolume: 0 }
     },
@@ -103,6 +100,15 @@ export const usePlayerStore = defineStore('player', {
   },
 
   actions: {
+    changeReputation(delta) {
+      this.reputation = Math.min(100, Math.max(0, this.reputation + delta))
+    },
+
+    addReputationHistory(date) {
+      this.reputationHistory.push({ date, value: this.reputation })
+      if (this.reputationHistory.length > 6) this.reputationHistory.shift()
+    },
+
     updateProductionConfig(modelId, territoryId, key, value) {
       if (!this.productionConfig[modelId]) this.productionConfig[modelId] = {}
       if (!this.productionConfig[modelId][territoryId]) {
@@ -123,7 +129,8 @@ export const usePlayerStore = defineStore('player', {
         marketing: turnInfo.marketingCost || 0,
         research: turnInfo.researchCost || 0,
         productionCosts: turnInfo.productionCosts || 0,
-        shipping: turnInfo.shippingCosts || 0
+        shipping: turnInfo.shippingCosts || 0,
+        recalls: turnInfo.recallCosts || 0
       }
 
       const totalExpenses = Object.values(expenses).reduce((a, b) => a + b, 0)
@@ -176,7 +183,7 @@ export const usePlayerStore = defineStore('player', {
           size: 1,
           level: 1,
           employees: 50,
-          salary: 1550, 
+          salary: 50, 
           maxEmployees: 500,
           location: locationName
         })
@@ -206,7 +213,7 @@ export const usePlayerStore = defineStore('player', {
       if (this.funds >= cost) {
         this.funds -= cost
         this.purchasedReports[territoryId] = {
-          date: new Date().toISOString(), // Internal timestamp
+          date: new Date().toISOString(), 
           segments,
           totalPotential
         }

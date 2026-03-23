@@ -12,6 +12,7 @@
     <q-tabs v-model="tab" dense class="text-grey" active-color="brown-10" indicator-color="brown-10" align="left" narrow-indicator>
       <q-tab name="reports" label="Reports" icon="bar_chart" />
       <q-tab name="personnel" label="Personnel" icon="groups" />
+      <q-tab name="risk" label="Risk Management" icon="gavel" />
       <q-tab name="research" label="Market Research" icon="analytics" />
       <q-tab name="logistics" label="Logistics" icon="local_shipping" />
       <q-tab name="expansion" label="Global Expansion" icon="public" />
@@ -66,7 +67,6 @@
               <div class="text-caption">Turn {{ reportsStore.lastTurn.turn || 0 }}</div>
             </q-card-section>
             <q-card-section>
-              <!-- 1. Monthly Ledger -->
               <div v-if="selectedReport === 'ledger'">
                 <div v-if="!playerStore.lastMonthPerformance" class="text-center q-pa-xl text-grey">
                   Run a turn to see financial reports.
@@ -97,7 +97,6 @@
                 </div>
               </div>
 
-              <!-- 2. Income By Model -->
               <div v-if="selectedReport === 'incomeByModel'">
                 <q-list separator v-if="Object.keys(reportsStore.lastTurn.incomeByModel).length > 0">
                   <q-item v-for="(amount, model) in reportsStore.lastTurn.incomeByModel" :key="model">
@@ -108,7 +107,6 @@
                 <div v-else class="text-center q-pa-xl text-grey">No sales data available.</div>
               </div>
 
-              <!-- 3. Income By Region -->
               <div v-if="selectedReport === 'incomeByRegion'">
                 <q-list separator v-if="Object.keys(reportsStore.lastTurn.incomeByRegion).length > 0">
                   <q-item v-for="(amount, region) in reportsStore.lastTurn.incomeByRegion" :key="region">
@@ -119,7 +117,6 @@
                 <div v-else class="text-center q-pa-xl text-grey">No sales data available.</div>
               </div>
 
-              <!-- 4. Model Report -->
               <div v-if="selectedReport === 'modelReport'">
                 <div v-if="Object.keys(reportsStore.lastTurn.modelReport).length > 0">
                   <div v-for="(regions, model) in reportsStore.lastTurn.modelReport" :key="model" class="q-mb-md">
@@ -147,7 +144,6 @@
                 <div v-else class="text-center q-pa-xl text-grey">No production or sales data available.</div>
               </div>
 
-              <!-- 5. Model Comparison -->
               <div v-if="selectedReport === 'modelComparison'">
                 <div v-if="Object.keys(reportsStore.lastTurn.modelComparison).length > 0">
                   <div v-for="(segments, region) in reportsStore.lastTurn.modelComparison" :key="region" class="q-mb-lg">
@@ -176,7 +172,6 @@
                 <div v-else class="text-center q-pa-xl text-grey">No competition data available.</div>
               </div>
 
-              <!-- 6. Profit Chart -->
               <div v-if="selectedReport === 'profitChart'">
                 <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end" style="height: 300px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
                   <div v-for="record in reportsStore.history" :key="record.turn" class="col text-center">
@@ -192,7 +187,6 @@
                 <div v-else class="text-center q-pa-xl text-grey">No historical data.</div>
               </div>
 
-              <!-- 7. Production Chart -->
               <div v-if="selectedReport === 'productionChart'">
                 <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end" style="height: 300px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
                   <div v-for="record in reportsStore.history" :key="record.turn" class="col text-center">
@@ -208,7 +202,6 @@
                 <div v-else class="text-center q-pa-xl text-grey">No historical data.</div>
               </div>
 
-              <!-- 8. Sales Chart -->
               <div v-if="selectedReport === 'salesChart'">
                 <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end" style="height: 300px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
                   <div v-for="record in reportsStore.history" :key="record.turn" class="col text-center">
@@ -223,190 +216,66 @@
                 </div>
                 <div v-else class="text-center q-pa-xl text-grey">No historical data.</div>
               </div>
-
             </q-card-section>
           </q-card>
         </div>
       </q-tab-panel>
 
-      <!-- DEBUG PANEL (Sim Analytics) -->
-      <q-tab-panel v-if="debugStore.debugMode" name="debug" class="q-pa-none">
-        <div v-if="!debugStore.lastTurnSnapshot" class="text-center q-pa-xl text-grey">
-          Run a turn with Developer Mode active to capture simulation math.
-        </div>
-        <div v-else class="row q-gutter-md">
+      <!-- RISK MANAGEMENT PANEL -->
+      <q-tab-panel name="risk" class="q-pa-none">
+        <div class="row q-gutter-md">
+          <q-card flat bordered class="col-12 col-md-4">
+            <q-card-section class="bg-red-10 text-white row items-center">
+              <div class="text-h6">Public Reputation</div>
+              <q-space />
+              <q-icon name="trending_up" size="sm" />
+            </q-card-section>
+            <q-card-section class="text-center q-pa-lg">
+              <div class="text-h2 text-weight-bolder" :class="getReputationColor(playerStore.reputation)">
+                {{ Math.floor(playerStore.reputation) }}
+              </div>
+              <div class="text-subtitle1 text-grey-8">Consumer Trust Rating</div>
+              <p class="text-caption text-grey-6 q-mt-sm">
+                Reputation influences global demand. Low trust makes your cars harder to sell, regardless of price or performance.
+              </p>
+            </q-card-section>
+            <q-card-section class="q-pa-none bg-grey-1" style="height: 150px">
+               <div class="row items-end justify-center full-height q-pa-sm">
+                 <div v-for="(h, idx) in playerStore.reputationHistory" :key="idx" class="col q-mx-xs bg-red-4" :style="{ height: h.value + '%' }">
+                   <q-tooltip>{{ h.date }}: {{ h.value }}</q-tooltip>
+                 </div>
+               </div>
+            </q-card-section>
+          </q-card>
 
-          <q-card flat bordered class="col-12">
-            <q-card-section class="bg-grey-8 text-white">
-              <div class="text-h6">World Context</div>
+          <q-card flat bordered class="col">
+            <q-card-section class="bg-blue-grey-9 text-white row items-center">
+              <div class="text-h6">Active Quality Alerts</div>
+              <q-space />
+              <q-badge color="red" :label="designStore.activeIssues.length" />
             </q-card-section>
             <q-card-section>
-              <div class="text-subtitle1 q-mb-md">Economic Climate: <span class="text-weight-bold">{{ worldStore.economicClimate.toFixed(2) }}x</span></div>
-              
-              <div class="text-subtitle2 q-mb-sm text-grey-8">Current Global Demand Segments:</div>
-              <q-list dense class="bg-grey-1 rounded-borders q-pa-sm" style="max-width: 400px">
-                <q-item v-for="(share, cls) in currentMarketSegments" :key="cls" class="q-py-xs">
+              <div v-if="designStore.activeIssues.length === 0" class="text-center q-pa-xl text-grey italic">
+                No active safety or reliability concerns reported by the public.
+              </div>
+              <q-list v-else separator>
+                <q-item v-for="issue in designStore.activeIssues" :key="issue.id" class="q-py-md">
+                  <q-item-section avatar>
+                    <q-icon name="warning" color="red" size="md" />
+                  </q-item-section>
                   <q-item-section>
-                    <div class="row items-center">
-                      <span class="text-weight-bold" style="width: 80px">{{ cls }}</span>
-                      <q-linear-progress :value="share" color="brown-5" class="col q-mx-sm" size="8px" />
-                      <span class="text-caption" style="width: 40px">{{ Math.round(share * 100) }}%</span>
+                    <q-item-label class="text-h6 text-red-9">{{ issue.type }}</q-item-label>
+                    <q-item-label>Model: <strong>{{ issue.modelName }}</strong> in {{ issue.territoryName }}</q-item-label>
+                    <q-item-label caption class="q-mt-sm">The public is demanding a resolution. Ignoring this will devastate consumer trust.</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <div class="row q-gutter-sm">
+                      <q-btn color="red-9" label="Ignore demands" outline @click="ignoreIssue(issue)" />
+                      <q-btn color="green-9" :label="`Issue Recall ($${issue.costToFix.toLocaleString()})`" @click="resolveIssue(issue)" />
                     </div>
                   </q-item-section>
                 </q-item>
               </q-list>
-
-              <div v-if="worldStore.activeEvents.length > 0" class="q-mt-lg">
-                <div class="text-caption q-mt-sm">Active Effects:</div>
-                <div class="row q-gutter-xs">
-                  <q-chip v-for="event in worldStore.activeEvents" :key="event.title" dense color="orange" text-color="white" icon="event">
-                    {{ event.title }}
-                  </q-chip>
-                </div>
-              </div>
-            </q-card-section>
-          </q-card>
-
-          <!-- AI Rival Finances -->
-          <q-card flat bordered class="col-12">
-            <q-card-section class="bg-indigo-10 text-white">
-              <div class="text-h6">Rival Company Financials (Last Turn)</div>
-            </q-card-section>
-            <q-card-section>
-              <div class="row q-col-gutter-md">
-                <div v-for="comp in competitorStore.competitors" :key="comp.id" class="col-12 col-md-4">
-                  <q-card flat bordered class="bg-indigo-1">
-                    <q-card-section class="q-pb-none">
-                      <div class="text-subtitle1 text-weight-bold">{{ comp.name }}</div>
-                      <div class="text-caption">Total Cash: ${{ comp.funds.toLocaleString() }}</div>
-                    </q-card-section>
-                    <q-card-section>
-                      <q-list dense>
-                        <q-item>
-                          <q-item-section>Income:</q-item-section>
-                          <q-item-section side class="text-green-9 text-weight-bold">+${{ comp.lastTurnLedger.income.toLocaleString() }}</q-item-section>
-                        </q-item>
-                        <q-item-label header class="q-pt-sm text-indigo-9 text-overline">Expenses</q-item-label>
-                        <q-item>
-                          <q-item-section>Production:</q-item-section>
-                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.productionCosts.toLocaleString() }}</q-item-section>
-                        </q-item>
-                        <q-item>
-                          <q-item-section>Salaries:</q-item-section>
-                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.salaries.toLocaleString() }}</q-item-section>
-                        </q-item>
-                        <q-item>
-                          <q-item-section>Shipping:</q-item-section>
-                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.shipping.toLocaleString() }}</q-item-section>
-                        </q-item>
-                        <q-item>
-                          <q-item-section>Maint/Lease:</q-item-section>
-                          <q-item-section side class="text-red-9">-${{ (comp.lastTurnLedger.maintenance + comp.lastTurnLedger.lease).toLocaleString() }}</q-item-section>
-                        </q-item>
-                        <q-item>
-                          <q-item-section>Research:</q-item-section>
-                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.research.toLocaleString() }}</q-item-section>
-                        </q-item>
-                        <q-separator class="q-my-xs" />
-                        <q-item class="text-weight-bold">
-                          <q-item-section>Net:</q-item-section>
-                          <q-item-section side :class="comp.lastTurnLedger.net >= 0 ? 'text-green-9' : 'text-red-9'">
-                            ${{ comp.lastTurnLedger.net.toLocaleString() }}
-                          </q-item-section>
-                        </q-item>
-                      </q-list>
-                    </q-card-section>
-                  </q-card>
-                </div>
-              </div>
-            </q-card-section>
-          </q-card>
-
-          <!-- Production Breakdown -->
-          <q-card flat bordered class="col-12">
-            <q-card-section class="bg-red-10 text-white">
-              <div class="text-h6">Production Math Breakdown</div>
-            </q-card-section>
-            <q-card-section>
-              <q-markup-table flat dense bordered>
-                <thead>
-                  <tr>
-                    <th class="text-left">Factory Owner</th>
-                    <th class="text-left">Location</th>
-                    <th class="text-right">Max Capacity</th>
-                    <th class="text-right">Total Requested</th>
-                    <th class="text-right">Actual Output</th>
-                    <th class="text-right">Utilization</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(data, fId) in debugStore.lastTurnSnapshot.production" :key="fId">
-                    <td class="text-left">{{ data.owner }}</td>
-                    <td class="text-left">{{ data.location }}</td>
-                    <td class="text-right">{{ Math.round(data.capacity) }}</td>
-                    <td class="text-right">{{ data.totalRequested }}</td>
-                    <td class="text-right">{{ data.actualOutput }}</td>
-                    <td class="text-right">{{ Math.round((data.actualOutput / (data.capacity || 1)) * 100) }}%</td>
-                  </tr>
-                </tbody>
-              </q-markup-table>
-            </q-card-section>
-          </q-card>
-
-          <!-- Sales Breakdown -->
-          <q-card flat bordered class="col-12">
-            <q-card-section class="bg-blue-grey-9 text-white row items-center">
-              <div class="text-h6">Sales & Pricing Math Breakdown</div>
-              <q-space />
-              <div class="text-caption text-italic">Target Price for {{ debugStore.lastTurnSnapshot.year }}: ${{ getBaseMarketPrice(debugStore.lastTurnSnapshot.year).toLocaleString() }}</div>
-            </q-card-section>
-            <q-card-section class="q-pa-none">
-              <q-expansion-item
-                v-for="(tData, tId) in debugStore.lastTurnSnapshot.sales"
-                :key="tId"
-                :label="tData.name"
-                header-class="bg-grey-2"
-              >
-                <div class="q-pa-md">
-                  <div v-for="(sData, sName) in tData.segments" :key="sName" class="q-mb-lg">
-                    <div class="text-subtitle2 text-indigo-9 border-bottom q-mb-sm">
-                      Segment: {{ sName }} (Base Demand: {{ sData.demand }})
-                    </div>
-                    <q-markup-table flat dense bordered>
-                      <thead>
-                        <tr>
-                          <th class="text-left">Model (Owner)</th>
-                          <th class="text-right">Price</th>
-                          <th class="text-right">Sticker Shock</th>
-                          <th class="text-right">Desirability</th>
-                          <th class="text-right">Pool Share</th>
-                          <th class="text-right">Final Sales</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="m in sData.models" :key="m.name" :class="m.owner === 'Player' ? 'bg-blue-1' : ''">
-                          <td class="text-left">
-                            {{ m.name }} ({{ m.owner }})
-                            <q-tooltip v-if="m.pricing">
-                              Affordability Cap: ${{ m.pricing.affordabilityCap.toLocaleString() }}<br>
-                              Price Factor: {{ m.pricing.priceFactor.toFixed(2) }}
-                            </q-tooltip>
-                          </td>
-                          <td class="text-right">${{ m.price.toLocaleString() }}</td>
-                          <td class="text-right">
-                            <q-badge :color="m.pricing?.stickerShock < 1 ? 'negative' : 'positive'">
-                              {{ (m.pricing?.stickerShock * 100).toFixed(0) }}%
-                            </q-badge>
-                          </td>
-                          <td class="text-right">{{ m.desirability.toFixed(4) }}</td>
-                          <td class="text-right">{{ Math.round(m.share * 100) }}%</td>
-                          <td class="text-right text-weight-bold">{{ m.actual }}</td>
-                        </tr>
-                      </tbody>
-                    </q-markup-table>
-                  </div>
-                </div>
-              </q-expansion-item>
             </q-card-section>
           </q-card>
         </div>
@@ -635,6 +504,186 @@
         </div>
       </q-tab-panel>
 
+      <!-- SIM ANALYTICS PANEL -->
+      <q-tab-panel v-if="debugStore.debugMode" name="debug" class="q-pa-none">
+        <div v-if="!debugStore.lastTurnSnapshot" class="text-center q-pa-xl text-grey">
+          Run a turn with Developer Mode active to capture simulation math.
+        </div>
+        <div v-else class="row q-gutter-md">
+          <q-card flat bordered class="col-12">
+            <q-card-section class="bg-grey-8 text-white">
+              <div class="text-h6">World Context</div>
+            </q-card-section>
+            <q-card-section>
+              <div class="text-subtitle1 q-mb-md">Economic Climate: <span class="text-weight-bold">{{ worldStore.economicClimate.toFixed(2) }}x</span></div>
+              <div class="text-subtitle2 q-mb-sm text-grey-8">Current Global Demand Segments:</div>
+              <q-list dense class="bg-grey-1 rounded-borders q-pa-sm" style="max-width: 400px">
+                <q-item v-for="(share, cls) in currentMarketSegments" :key="cls" class="q-py-xs">
+                  <q-item-section>
+                    <div class="row items-center">
+                      <span class="text-weight-bold" style="width: 80px">{{ cls }}</span>
+                      <q-linear-progress :value="share" color="brown-5" class="col q-mx-sm" size="8px" />
+                      <span class="text-caption" style="width: 40px">{{ Math.round(share * 100) }}%</span>
+                    </div>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+              <div v-if="worldStore.activeEvents.length > 0" class="q-mt-lg">
+                <div class="text-caption q-mt-sm">Active Effects:</div>
+                <div class="row q-gutter-xs">
+                  <q-chip v-for="event in worldStore.activeEvents" :key="event.title" dense color="orange" text-color="white" icon="event">
+                    {{ event.title }}
+                  </q-chip>
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+
+          <!-- AI Rival Finances -->
+          <q-card flat bordered class="col-12">
+            <q-card-section class="bg-indigo-10 text-white">
+              <div class="text-h6">Rival Company Financials (Last Turn)</div>
+            </q-card-section>
+            <q-card-section>
+              <div class="row q-col-gutter-md">
+                <div v-for="comp in competitorStore.competitors" :key="comp.id" class="col-12 col-md-4">
+                  <q-card flat bordered class="bg-indigo-1">
+                    <q-card-section class="q-pb-none">
+                      <div class="text-subtitle1 text-weight-bold">{{ comp.name }}</div>
+                      <div class="text-caption">Total Cash: ${{ comp.funds.toLocaleString() }}</div>
+                    </q-card-section>
+                    <q-card-section>
+                      <q-list dense>
+                        <q-item>
+                          <q-item-section>Income:</q-item-section>
+                          <q-item-section side class="text-green-9 text-weight-bold">+${{ comp.lastTurnLedger.income.toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-item-label header class="q-pt-sm text-indigo-9 text-overline">Expenses</q-item-label>
+                        <q-item>
+                          <q-item-section>Production:</q-item-section>
+                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.productionCosts.toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-item>
+                          <q-item-section>Salaries:</q-item-section>
+                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.salaries.toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-item>
+                          <q-item-section>Shipping:</q-item-section>
+                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.shipping.toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-item>
+                          <q-item-section>Maint/Lease:</q-item-section>
+                          <q-item-section side class="text-red-9">-${{ (comp.lastTurnLedger.maintenance + comp.lastTurnLedger.lease).toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-item>
+                          <q-item-section>Research:</q-item-section>
+                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.research.toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-separator class="q-my-xs" />
+                        <q-item class="text-weight-bold">
+                          <q-item-section>Net:</q-item-section>
+                          <q-item-section side :class="comp.lastTurnLedger.net >= 0 ? 'text-green-9' : 'text-red-9'">
+                            ${{ comp.lastTurnLedger.net.toLocaleString() }}
+                          </q-item-section>
+                        </q-item>
+                      </q-list>
+                    </q-card-section>
+                  </q-card>
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+
+          <!-- Production Breakdown -->
+          <q-card flat bordered class="col-12">
+            <q-card-section class="bg-red-10 text-white">
+              <div class="text-h6">Production Math Breakdown</div>
+            </q-card-section>
+            <q-card-section>
+              <q-markup-table flat dense bordered>
+                <thead>
+                  <tr>
+                    <th class="text-left">Factory Owner</th>
+                    <th class="text-left">Location</th>
+                    <th class="text-right">Max Capacity</th>
+                    <th class="text-right">Total Requested</th>
+                    <th class="text-right">Actual Output</th>
+                    <th class="text-right">Utilization</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(data, fId) in debugStore.lastTurnSnapshot.production" :key="fId">
+                    <td class="text-left">{{ data.owner }}</td>
+                    <td class="text-left">{{ data.location }}</td>
+                    <td class="text-right">{{ Math.round(data.capacity) }}</td>
+                    <td class="text-right">{{ data.totalRequested }}</td>
+                    <td class="text-right">{{ data.actualOutput }}</td>
+                    <td class="text-right">{{ Math.round((data.actualOutput / (data.capacity || 1)) * 100) }}%</td>
+                  </tr>
+                </tbody>
+              </q-markup-table>
+            </q-card-section>
+          </q-card>
+
+          <!-- Sales Breakdown -->
+          <q-card flat bordered class="col-12">
+            <q-card-section class="bg-blue-grey-9 text-white row items-center">
+              <div class="text-h6">Sales & Pricing Math Breakdown</div>
+              <q-space />
+              <div class="text-caption text-italic">Target Price for {{ debugStore.lastTurnSnapshot.year }}: ${{ getBaseMarketPrice(debugStore.lastTurnSnapshot.year).toLocaleString() }}</div>
+            </q-card-section>
+            <q-card-section class="q-pa-none">
+              <q-expansion-item
+                v-for="(tData, tId) in debugStore.lastTurnSnapshot.sales"
+                :key="tId"
+                :label="tData.name"
+                header-class="bg-grey-2"
+              >
+                <div class="q-pa-md">
+                  <div v-for="(sData, sName) in tData.segments" :key="sName" class="q-mb-lg">
+                    <div class="text-subtitle2 text-indigo-9 border-bottom q-mb-sm">
+                      Segment: {{ sName }} (Base Demand: {{ sData.demand }})
+                    </div>
+                    <q-markup-table flat dense bordered>
+                      <thead>
+                        <tr>
+                          <th class="text-left">Model (Owner)</th>
+                          <th class="text-right">Price</th>
+                          <th class="text-right">Sticker Shock</th>
+                          <th class="text-right">Desirability</th>
+                          <th class="text-right">Pool Share</th>
+                          <th class="text-right">Final Sales</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="m in sData.models" :key="m.name" :class="m.owner === 'Player' ? 'bg-blue-1' : ''">
+                          <td class="text-left">
+                            {{ m.name }} ({{ m.owner }})
+                            <q-tooltip v-if="m.pricing">
+                              Affordability Cap: ${{ m.pricing.affordabilityCap.toLocaleString() }}<br>
+                              Price Factor: {{ m.pricing.priceFactor.toFixed(2) }}
+                            </q-tooltip>
+                          </td>
+                          <td class="text-right">${{ m.price.toLocaleString() }}</td>
+                          <td class="text-right">
+                            <q-badge :color="m.pricing?.stickerShock < 1 ? 'negative' : 'positive'">
+                              {{ (m.pricing?.stickerShock * 100).toFixed(0) }}%
+                            </q-badge>
+                          </td>
+                          <td class="text-right">{{ m.desirability.toFixed(4) }}</td>
+                          <td class="text-right">{{ Math.round(m.share * 100) }}%</td>
+                          <td class="text-right text-weight-bold">{{ m.actual }}</td>
+                        </tr>
+                      </tbody>
+                    </q-markup-table>
+                  </div>
+                </div>
+              </q-expansion-item>
+            </q-card-section>
+          </q-card>
+        </div>
+      </q-tab-panel>
+
       <!-- LOGISTICS PANEL -->
       <q-tab-panel name="logistics" class="q-pa-none">
         <div class="row q-gutter-md">
@@ -781,9 +830,10 @@
                 </div>
               </div>
 
-              <div class="row q-gutter-sm">
-                <q-btn color="green-9" label="Deposit $5k" class="col" :disabled="playerStore.funds < 5000" @click="bankStore.deposit(5000)" />
-                <q-btn color="blue-9" label="Withdraw $5k" class="col" :disabled="bankStore.savingsBalance < 5000" @click="bankStore.withdraw(5000)" />
+              <div class="row q-gutter-sm items-center">
+                <q-input v-model.number="savingsAmount" type="number" dense outlined label="Amount" class="col" />
+                <q-btn color="green-9" label="Deposit" class="col-auto" :disabled="!savingsAmount || savingsAmount <= 0" @click="handleDeposit" />
+                <q-btn color="blue-9" label="Withdraw" class="col-auto" :disabled="!savingsAmount || savingsAmount <= 0" @click="handleWithdraw" />
               </div>
             </q-card-section>
           </q-card>
@@ -870,6 +920,7 @@ import { useWorldStore } from '../stores/world'
 import { useGameStore } from '../stores/game'
 import { useCompetitorStore } from '../stores/competitors'
 import { useBankStore } from '../stores/bank'
+import { useDesignStore } from '../stores/design'
 import { useSavesStore } from '../stores/saves'
 import { useDebugStore } from '../stores/debug'
 import { useReportsStore } from '../stores/reports'
@@ -883,6 +934,7 @@ const worldStore = useWorldStore()
 const gameStore = useGameStore()
 const competitorStore = useCompetitorStore()
 const bankStore = useBankStore()
+const designStore = useDesignStore()
 const savesStore = useSavesStore()
 const debugStore = useDebugStore()
 const reportsStore = useReportsStore()
@@ -937,17 +989,25 @@ function getChartHeight(value, type) {
     })
   })
   if (max === 0) return 0
-  return Math.max(5, (value / max) * 200) // 200px max height, minimum 5px bar
+  // Value can be negative for profit
+  const absValue = Math.abs(value)
+  return Math.max(5, (absValue / max) * 200)
 }
 
 function getCompanyColor(companyId) {
   const colors = {
-    player: '#4caf50', // green
-    'ford-rival': '#1976d2', // blue
-    'gm-rival': '#f44336', // red
-    'euro-rival': '#ff9800' // orange
+    player: '#4caf50',
+    'ford-rival': '#1976d2',
+    'gm-rival': '#f44336',
+    'euro-rival': '#ff9800'
   }
   return colors[companyId] || '#9e9e9e'
+}
+
+function getReputationColor(val) {
+  if (val < 30) return 'text-negative'
+  if (val < 60) return 'text-orange-9'
+  return 'text-positive'
 }
 
 function getMarketWage(territoryId) {
@@ -1013,6 +1073,27 @@ function modernizeFactory(factory) {
   })
 }
 
+function resolveIssue(issue) {
+  const result = designStore.resolveIssue(issue.id)
+  if (result.success) {
+    $q.notify({ color: 'positive', message: `Recall for ${issue.modelName} issued in ${issue.territoryName}. Cost: $${result.cost.toLocaleString()}`, icon: 'check_circle' })
+  } else {
+    $q.notify({ color: 'negative', message: 'Insufficient funds to issue recall.' })
+  }
+}
+
+function ignoreIssue(issue) {
+  $q.dialog({
+    title: 'Ignore Public Demands?',
+    message: 'If you ignore these safety concerns, your company reputation will take a massive hit (-15). Are you sure?',
+    cancel: true,
+    persistent: true
+  }).onOk(() => {
+    designStore.ignoreIssue(issue.id)
+    $q.notify({ color: 'negative', message: 'Reputation damaged. The public will remember this.', icon: 'mood_bad' })
+  })
+}
+
 function buyReport(territoryId) {
   const t = getSelectedTerritory(territoryId)
   const segments = getMarketSegments(gameStore.year)
@@ -1033,6 +1114,28 @@ function getMarketInsight(cls) {
     [VEHICLE_CLASSES.UTILITY]: 'Industrial and rural buyers focus on durability, torque, and cargo space.'
   }
   return insights[cls]
+}
+
+const savingsAmount = ref(0)
+
+function handleDeposit() {
+  if (savingsAmount.value > playerStore.funds) {
+    $q.notify({ color: 'negative', message: 'You do not have enough funds to deposit that amount.' })
+    return
+  }
+  bankStore.deposit(savingsAmount.value)
+  $q.notify({ color: 'positive', message: `Deposited $${savingsAmount.value.toLocaleString()} to savings.` })
+  savingsAmount.value = 0
+}
+
+function handleWithdraw() {
+  if (savingsAmount.value > bankStore.savingsBalance) {
+    $q.notify({ color: 'negative', message: 'You do not have enough savings to withdraw that amount.' })
+    return
+  }
+  bankStore.withdraw(savingsAmount.value)
+  $q.notify({ color: 'positive', message: `Withdrew $${savingsAmount.value.toLocaleString()} from savings.` })
+  savingsAmount.value = 0
 }
 
 async function resetGame() {

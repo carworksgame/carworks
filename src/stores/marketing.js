@@ -10,15 +10,15 @@ export const useMarketingStore = defineStore('marketing', {
       'south-america': 0,
       'asia': 0
     },
-    // Regional Campaigns: territoryId -> { modelId -> mediaObject }
+    // Regional Campaigns: territoryId -> { modelId -> { mediaTypeId -> amount } }
     activeRegionalCampaigns: {}, 
     
     mediaTypes: [
-      { id: 'billboard', name: 'Billboards', cost: 200, boost: 1.05, minYear: 1908 },
-      { id: 'newspaper', name: 'Newspaper Ads', cost: 500, boost: 1.15, minYear: 1908 },
-      { id: 'radio', name: 'Radio Spots', cost: 1500, boost: 1.4, minYear: 1920 },
-      { id: 'magazine', name: 'Glossy Magazines', cost: 3000, boost: 1.8, minYear: 1945 },
-      { id: 'television', name: 'TV Commercials', cost: 10000, boost: 3.5, minYear: 1950 },
+      { id: 'billboard', name: 'Billboards', efficiency: 1.2, minYear: 1908 },
+      { id: 'newspaper', name: 'Newspaper Ads', efficiency: 1.5, minYear: 1908 },
+      { id: 'radio', name: 'Radio Spots', efficiency: 2.0, minYear: 1920 },
+      { id: 'magazine', name: 'Glossy Magazines', efficiency: 2.5, minYear: 1945 },
+      { id: 'television', name: 'TV Commercials', efficiency: 4.5, minYear: 1950 },
     ]
   }),
 
@@ -27,17 +27,25 @@ export const useMarketingStore = defineStore('marketing', {
   getters: {
     totalMonthlyMarketingCost: (state) => {
       let total = 0
-      Object.values(state.activeRegionalCampaigns).forEach(territoryCampaigns => {
-        Object.values(territoryCampaigns).forEach(campaign => {
-          total += (campaign.cost || 0)
+      Object.values(state.activeRegionalCampaigns).forEach(territoryModels => {
+        Object.values(territoryModels).forEach(modelBudgets => {
+          Object.values(modelBudgets).forEach(amount => {
+            total += (amount || 0)
+          })
         })
       })
       return total
     },
 
     getTerritoryMarketingCost: (state) => (territoryId) => {
-      const territoryCampaigns = state.activeRegionalCampaigns[territoryId] || {}
-      return Object.values(territoryCampaigns).reduce((acc, c) => acc + (c.cost || 0), 0)
+      const territoryModels = state.activeRegionalCampaigns[territoryId] || {}
+      let total = 0
+      Object.values(territoryModels).forEach(modelBudgets => {
+        Object.values(modelBudgets).forEach(amount => {
+          total += (amount || 0)
+        })
+      })
+      return total
     },
 
     getAwareness: (state) => (territoryId) => {
@@ -45,24 +53,44 @@ export const useMarketingStore = defineStore('marketing', {
     },
 
     getBoostForModel: (state) => (modelId, territoryId) => {
-      return state.activeRegionalCampaigns[territoryId]?.[modelId]?.boost || 1.0
+      const modelBudgets = state.activeRegionalCampaigns[territoryId]?.[modelId] || {}
+      const worldStore = useWorldStore()
+      
+      // Scaling factor: Advertising is more expensive/needs more spend as time passes
+      // In 1908, $500 is a lot. In 2008, it's nothing.
+      const eraScale = 1000 * worldStore.inflationMultiplier
+      
+      let aggregateBoost = 0
+      Object.keys(modelBudgets).forEach(mediaId => {
+        const amount = modelBudgets[mediaId] || 0
+        if (amount > 0) {
+          const media = state.mediaTypes.find(m => m.id === mediaId)
+          if (media) {
+            // Formula: (Amount / EraScale) * Efficiency
+            // Cap individual channel boost to prevent infinite scaling
+            const channelBoost = Math.min(2.0, (amount / eraScale) * media.efficiency)
+            aggregateBoost += channelBoost
+          }
+        }
+      })
+
+      return 1.0 + aggregateBoost
     }
   },
 
   actions: {
-    setCampaign(territoryId, modelId, mediaTypeId) {
+    setBudget(territoryId, modelId, mediaTypeId, amount) {
       if (!this.activeRegionalCampaigns[territoryId]) {
         this.activeRegionalCampaigns[territoryId] = {}
       }
-
-      if (!mediaTypeId) {
-        delete this.activeRegionalCampaigns[territoryId][modelId]
-        return
+      if (!this.activeRegionalCampaigns[territoryId][modelId]) {
+        this.activeRegionalCampaigns[territoryId][modelId] = {}
       }
 
-      const media = this.mediaTypes.find(m => m.id === mediaTypeId)
-      if (media) {
-        this.activeRegionalCampaigns[territoryId][modelId] = { ...media }
+      if (amount <= 0) {
+        delete this.activeRegionalCampaigns[territoryId][modelId][mediaTypeId]
+      } else {
+        this.activeRegionalCampaigns[territoryId][modelId][mediaTypeId] = amount
       }
     },
 
@@ -72,14 +100,13 @@ export const useMarketingStore = defineStore('marketing', {
       worldStore.territories.forEach(territory => {
         const cost = this.getTerritoryMarketingCost(territory.id)
         const currentAwareness = this.regionalAwareness[territory.id] || 0
+        const eraScale = 5000 * worldStore.inflationMultiplier
 
         if (cost > 0) {
-          // Growth: Awareness rises based on regional spend
-          // $5000 spend gives ~1% growth
-          const growth = cost / 5000
+          // Awareness grows based on spend relative to the era
+          const growth = (cost / eraScale)
           this.regionalAwareness[territory.id] = Math.min(100, currentAwareness + growth)
         } else {
-          // Decay: Awareness drops by 0.1% if no marketing is active in the region
           this.regionalAwareness[territory.id] = Math.max(0, currentAwareness - 0.1)
         }
       })
