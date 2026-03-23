@@ -19,6 +19,7 @@ jobs:
           npm install
           npm install -g @quasar/cli
       - run: yarn build
+      - run: yarn deploy
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
