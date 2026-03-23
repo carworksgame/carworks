@@ -8,7 +8,7 @@
     ],
     "rewrites": [
       {
-        "source": "./dist/spa",
+        "source": "./dist/spa/*",
         "destination": "/index.html"
       }
     ]
