@@ -14,6 +14,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+      - name: Install dependencies and Quasar CLI
+        run: |
+          npm install
+          npm install -g @quasar/cli
       - run: yarn build
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
