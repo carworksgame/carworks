@@ -9,69 +9,57 @@
     </div>
 
     <div class="row q-gutter-md">
-      <!-- Current Project -->
+      <!-- Active Projects -->
       <q-card flat bordered class="col-12 col-md-7">
-        <q-card-section class="bg-blue-10 text-white">
-          <div class="text-h6">Current Research Project</div>
+        <q-card-section class="bg-blue-10 text-white row items-center">
+          <div class="text-h6">Active Research Projects</div>
+          <q-space />
+          <q-badge color="blue-7" :label="`${researchStore.activeProjects.length} / 4 Tracks Active`" />
         </q-card-section>
 
-        <q-card-section class="q-pa-lg">
-          <div v-if="!researchStore.currentProject" class="text-center">
+        <q-card-section class="q-pa-md">
+          <div v-if="researchStore.activeProjects.length === 0" class="text-center q-pa-xl">
             <q-icon name="biotech" size="64px" color="grey-4" />
-            <div class="text-h6 text-grey-6">No Active Project</div>
-            <p class="text-grey">Select a technology from the list to begin research.</p>
+            <div class="text-h6 text-grey-6">No Active Projects</div>
+            <p class="text-grey">Assign technicians and select technology from the list below to begin.</p>
           </div>
           
-          <div v-else>
-            <div class="row items-center justify-between q-mb-md">
-              <div>
-                <div class="text-h5 text-blue-9">{{ researchStore.currentProject.name }}</div>
-                <div class="text-caption text-grey-7">{{ researchStore.currentProject.category }} Technology</div>
-              </div>
-              <q-badge color="blue" label="Active" />
-            </div>
+          <q-list v-else separator>
+            <q-item v-for="project in researchStore.activeProjects" :key="project.id" class="q-py-md">
+              <q-item-section>
+                <div class="row items-center justify-between q-mb-sm">
+                  <div>
+                    <div class="text-h6 text-blue-9">{{ project.name }}</div>
+                    <div class="text-caption text-grey-7">{{ project.category }} Track</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-subtitle2 text-blue-10">{{ getProjectPower(project) }} pts/mo</div>
+                    <div class="text-caption text-grey-6">Est: {{ getEstCompletion(project) }}</div>
+                  </div>
+                </div>
 
-            <div class="q-mb-md">
-              <div class="row justify-between q-mb-xs">
-                <span class="text-weight-medium">Progress</span>
-                <span>{{ Math.round(researchStore.researchProgress) }}%</span>
-              </div>
-              <q-linear-progress 
-                :value="researchStore.researchProgress / 100" 
-                color="blue" 
-                size="20px" 
-                stripe 
-                rounded
-              />
-            </div>
-
-            <div class="row q-gutter-sm text-caption text-grey-8">
-              <div class="bg-blue-1 q-pa-sm rounded-borders">
-                Total Cost: ${{ researchStore.currentProject.cost.toLocaleString() }}
-              </div>
-              <div class="bg-blue-1 q-pa-sm rounded-borders">
-                Remaining: ${{ (researchStore.currentProject.cost - researchStore.currentProject.progress).toLocaleString() }}
-              </div>
-              <div class="bg-blue-1 q-pa-sm rounded-borders">
-                Power: {{ researchPower }} pts/mo
-              </div>
-              <div class="bg-blue-1 q-pa-sm rounded-borders">
-                Est. Completion: {{ estCompletion }}
-              </div>
-            </div>
-            
-            <div v-if="researchPower === 0" class="q-mt-md text-negative text-weight-bold row items-center">
-              <q-icon name="warning" class="q-mr-xs" />
-              Assign technicians to the {{ researchStore.currentProject.category }} track to progress!
-            </div>
-          </div>
+                <q-linear-progress 
+                  :value="project.progress / project.cost" 
+                  color="blue" 
+                  size="15px" 
+                  stripe 
+                  rounded
+                />
+                
+                <div v-if="getProjectPower(project) === 0" class="q-mt-xs text-negative text-caption text-weight-bold row items-center">
+                  <q-icon name="warning" size="xs" class="q-mr-xs" />
+                  No technicians assigned to the {{ project.category }} track!
+                </div>
+              </q-item-section>
+            </q-item>
+          </q-list>
         </q-card-section>
 
         <q-separator />
 
         <q-card-section>
           <div class="row justify-between items-center q-mb-sm">
-            <div class="text-subtitle2">Specialized Track Assignments</div>
+            <div class="text-subtitle2 text-uppercase text-grey-7">Personnel Distribution</div>
             <q-badge :color="idleTechnicians > 0 ? 'orange' : 'grey-7'">
               {{ idleTechnicians }} Technicians Idle
             </q-badge>
@@ -100,7 +88,7 @@
         <q-card-section class="bg-green-8 text-white">
           <div class="text-h6">Unlocked Technologies</div>
         </q-card-section>
-        <q-card-section class="q-pa-none">
+        <q-card-section class="q-pa-none" style="max-height: 500px; overflow-y: auto">
           <q-list separator>
             <q-item v-for="techId in researchStore.unlockedTech" :key="techId">
               <q-item-section avatar>
@@ -136,9 +124,13 @@
             flat 
             color="blue" 
             label="Start Research" 
-            :disabled="researchStore.isResearching"
+            :disabled="isCategoryBusy(tech.category)"
             @click="researchStore.startProject(tech.id)"
-          />
+          >
+            <q-tooltip v-if="isCategoryBusy(tech.category)">
+              Already researching a project in the {{ tech.category }} track.
+            </q-tooltip>
+          </q-btn>
         </q-card-actions>
       </q-card>
     </div>
@@ -159,18 +151,21 @@ const idleTechnicians = computed(() => {
   return playerStore.technicians - researchStore.totalAssignedTechnicians
 })
 
-const researchPower = computed(() => {
-  if (!researchStore.currentProject) return 0
-  const assigned = researchStore.trackAssignments[researchStore.currentProject.category] || 0
+function getProjectPower(project) {
+  const assigned = researchStore.trackAssignments[project.category] || 0
   return assigned * researchStore.progressPerTech
-})
+}
 
-const estCompletion = computed(() => {
-  if (!researchStore.currentProject) return '-'
-  if (researchPower.value === 0) return 'Infinite'
-  const remaining = researchStore.currentProject.cost - researchStore.currentProject.progress
-  return `${Math.ceil(remaining / researchPower.value)} months`
-})
+function getEstCompletion(project) {
+  const power = getProjectPower(project)
+  if (power === 0) return 'Infinite'
+  const remaining = project.cost - project.progress
+  return `${Math.ceil(remaining / power)} months`
+}
+
+function isCategoryBusy(cat) {
+  return researchStore.activeProjects.some(p => p.category === cat)
+}
 
 function updateTrack(track, delta) {
   const current = researchStore.trackAssignments[track] || 0

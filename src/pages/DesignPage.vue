@@ -13,6 +13,24 @@
         <q-card-section class="q-gutter-y-md">
           <q-input v-model="currentDesign.name" label="Model Name" dense outlined />
 
+          <div class="q-mb-sm">
+            <div class="text-caption q-mb-xs">Vehicle Class</div>
+            <q-btn-toggle
+              v-model="currentDesign.vehicleClass"
+              spread
+              no-caps
+              rounded
+              unelevated
+              toggle-color="teal-9"
+              color="white"
+              text-color="teal-9"
+              :options="classOptions"
+            />
+            <div class="bg-teal-1 q-pa-sm q-mt-sm rounded-borders text-caption text-teal-10">
+              <q-icon name="info" size="xs" /> {{ classPriorities[currentDesign.vehicleClass] }}
+            </div>
+          </div>
+
           <q-select
             v-model="currentDesign.chassis"
             :options="unlockedComponents.chassis"
@@ -118,7 +136,7 @@
     <div v-else class="row q-gutter-md">
       <q-card flat bordered class="col-12">
         <q-card-section class="bg-blue-10 text-white row items-center">
-          <div class="text-h6">Engineering Lab: {{ designStore.activePrototype.name }}</div>
+          <div class="text-h6">Engineering Lab: {{ designStore.activePrototype.name }} ({{ designStore.activePrototype.vehicleClass }})</div>
           <q-space />
           <q-btn flat dense color="white" label="Scrap Draft" icon="delete" @click="designStore.scrapPrototype()" />
         </q-card-section>
@@ -189,7 +207,10 @@
     <div class="row q-gutter-md">
        <q-card v-for="model in designStore.models" :key="model.id" flat bordered class="col-12 col-sm-3">
          <q-card-section class="bg-teal-1">
-           <div class="text-h6">{{ model.name }}</div>
+           <div class="row justify-between no-wrap">
+             <div class="text-h6 ellipsis">{{ model.name }}</div>
+             <q-badge color="teal-9" :label="model.vehicleClass" />
+           </div>
            <div class="text-caption">Launched: {{ model.introduced }}</div>
          </q-card-section>
          <q-card-section>
@@ -220,7 +241,7 @@
 
 <script setup>
 import { reactive, computed, watch } from 'vue'
-import { useDesignStore } from '../stores/design'
+import { useDesignStore, VEHICLE_CLASSES } from '../stores/design'
 import { useResearchStore } from '../stores/research'
 import { usePlayerStore } from '../stores/player'
 import { useQuasar } from 'quasar'
@@ -235,12 +256,27 @@ const unlockedComponents = computed(() => designStore.getUnlockedComponents(rese
 
 const currentDesign = reactive({
   name: 'Model A',
+  vehicleClass: VEHICLE_CLASSES.UTILITY,
   chassis: null,
   engine: null,
   steering: null,
   brakes: null,
   features: []
 })
+
+const classOptions = [
+  { label: 'Economy', value: VEHICLE_CLASSES.ECONOMY },
+  { label: 'Luxury', value: VEHICLE_CLASSES.LUXURY },
+  { label: 'Sport', value: VEHICLE_CLASSES.SPORT },
+  { label: 'Utility', value: VEHICLE_CLASSES.UTILITY },
+]
+
+const classPriorities = {
+  [VEHICLE_CLASSES.ECONOMY]: 'Prioritizes low purchase price and high fuel economy.',
+  [VEHICLE_CLASSES.LUXURY]: 'Prioritizes high safety and advanced features. Less price sensitive.',
+  [VEHICLE_CLASSES.SPORT]: 'Prioritizes power-to-weight ratio and rapid acceleration.',
+  [VEHICLE_CLASSES.UTILITY]: 'Prioritizes durability, cargo capacity, and reliable power.'
+}
 
 const availableTests = [
   { id: 'acceleration', label: 'Acceleration (0-60)', fee: 500 },
@@ -297,6 +333,7 @@ function startPrototype() {
   }
   designStore.startPrototype({
     name: currentDesign.name,
+    vehicleClass: currentDesign.vehicleClass,
     cost: totalCost.value,
     weight: totalWeight.value,
     stats: { ...stats.value },

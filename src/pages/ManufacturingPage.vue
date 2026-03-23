@@ -173,8 +173,13 @@ function marginColor(territoryId) {
 }
 
 function getCapacity(territoryId) {
-  const factories = playerStore.factories.filter(f => f.territory === territoryId)
-  return factories.reduce((acc, f) => acc + (f.employees * f.productivity), 0)
+  // Region capacity is the sum of output from ALL factories supplying this territory
+  // Wait, actually in the new Logistics system, a territory is supplied by ONE factory.
+  const factoryId = playerStore.supplyLines[territoryId]
+  const factory = playerStore.factories.find(f => f.id === factoryId)
+  if (!factory) return 0
+  
+  return Math.floor(factory.employees * playerStore.getFactoryProductivity(factory.id))
 }
 
 function getUsedCapacity(territoryId) {

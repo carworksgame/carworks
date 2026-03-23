@@ -5,11 +5,12 @@ export const useWorldStore = defineStore('world', {
     economicClimate: 1.0,
     globalDemandMultiplier: 1.0,
     activeEvents: [],
+    inflationMultiplier: 1.0, // Starting point in 1908
     territories: [
-      { id: 'north-america', name: 'North America', population: 92000000, wealth: 1.2, active: true, baseWage: 1500 },
-      { id: 'europe', name: 'Europe', population: 400000000, wealth: 1.0, active: false, unlockCost: 50000, baseWage: 1400 },
-      { id: 'south-america', name: 'South America', population: 40000000, wealth: 0.5, active: false, unlockCost: 30000, baseWage: 700 },
-      { id: 'asia', name: 'Asia', population: 900000000, wealth: 0.3, active: false, unlockCost: 75000, baseWage: 600 },
+      { id: 'north-america', name: 'North America', population: 92000000, wealth: 1.2, active: true, baseWage: 50 }, // Normalized to 1908 monthly
+      { id: 'europe', name: 'Europe', population: 400000000, wealth: 1.0, active: false, unlockCost: 50000, baseWage: 45 },
+      { id: 'south-america', name: 'South America', population: 40000000, wealth: 0.5, active: false, unlockCost: 30000, baseWage: 20 },
+      { id: 'asia', name: 'Asia', population: 900000000, wealth: 0.3, active: false, unlockCost: 75000, baseWage: 15 },
     ],
     // Shipping cost per unit between regions
     shippingRates: {
@@ -50,11 +51,13 @@ export const useWorldStore = defineStore('world', {
         if (this.activeEvents.length > 5) this.activeEvents.shift()
       }
       
-      // Annual inflation: roughly 3-5% increase in base wages every year
+      // Annual inflation and wage growth
       if (currentMonth === 0) { // Every January
         this.territories.forEach(t => {
-          t.baseWage = Math.round(t.baseWage * 1.04)
+          t.baseWage = Math.round(t.baseWage * 1.04) // 4% wage growth
         })
+        // Global inflation: costs rise by ~3.5% annually
+        this.inflationMultiplier *= 1.035
       }
 
       // Random slight fluctuations in demand

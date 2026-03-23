@@ -6,38 +6,56 @@ export const useCompetitorStore = defineStore('competitors', {
       {
         id: 'ford-rival',
         name: 'Blue Oval Motors',
+        homeTerritory: 'north-america',
         funds: 100000,
         reputation: 50,
         unlockedTech: ['basic-chassis', 'crank-start', 'tiller-steering'],
         models: [
-          { id: 'rival-model-t', name: 'Model T-Rival', cost: 400, price: 850, stats: { pwrRatio: 2, safety: 10, power: 10, economy: 15 } }
+          { id: 'rival-model-t', name: 'Model T-Rival', cost: 650, price: 1200, stats: { pwrRatio: 2, safety: 10, power: 10, economy: 15 } }
         ],
         marketShare: 0,
-        productionLimit: 500 // units per month
+        factories: [
+          { id: 'ai-f1', location: 'Detroit-Rival', level: 1, employees: 200, productivity: 1.0, territory: 'north-america', salary: 50 }
+        ],
+        researchInvestment: 500,
+        regionalInventory: {},
+        lastTurnLedger: { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0, net: 0 }
       },
       {
         id: 'gm-rival',
         name: 'General Auto',
+        homeTerritory: 'north-america',
         funds: 150000,
         reputation: 40,
         unlockedTech: ['basic-chassis', 'crank-start', 'tiller-steering'],
         models: [
-          { id: 'rival-luxury', name: 'Premier', cost: 800, price: 2000, stats: { pwrRatio: 3, safety: 15, power: 25, economy: 10 } }
+          { id: 'rival-luxury', name: 'Premier', cost: 900, price: 2500, stats: { pwrRatio: 3, safety: 15, power: 25, economy: 10 } }
         ],
         marketShare: 0,
-        productionLimit: 300
+        factories: [
+          { id: 'ai-f2', location: 'Lansing-Rival', level: 1, employees: 150, productivity: 1.0, territory: 'north-america', salary: 50 }
+        ],
+        researchInvestment: 800,
+        regionalInventory: {},
+        lastTurnLedger: { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0, net: 0 }
       },
       {
         id: 'euro-rival',
         name: 'Continental Cars',
+        homeTerritory: 'europe',
         funds: 80000,
         reputation: 30,
         unlockedTech: ['basic-chassis', 'crank-start', 'tiller-steering'],
         models: [
-          { id: 'rival-euro', name: 'Le Mans', cost: 300, price: 700, stats: { pwrRatio: 4, safety: 5, power: 15, economy: 18 } }
+          { id: 'rival-euro', name: 'Le Mans', cost: 500, price: 1100, stats: { pwrRatio: 4, safety: 5, power: 15, economy: 18 } }
         ],
         marketShare: 0,
-        productionLimit: 200
+        factories: [
+          { id: 'ai-f3', location: 'Paris-Rival', level: 1, employees: 120, productivity: 1.0, territory: 'europe', salary: 45 }
+        ],
+        researchInvestment: 400,
+        regionalInventory: {},
+        lastTurnLedger: { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0, net: 0 }
       }
     ]
   }),
@@ -47,17 +65,16 @@ export const useCompetitorStore = defineStore('competitors', {
   actions: {
     processAITurns(year, techPool) {
       this.competitors.forEach(comp => {
-        // 1. Simple AI Research: 10% chance to unlock a random available tech
+        // 1. Simple AI Research
         if (Math.random() > 0.9) {
           const available = techPool.filter(t => !comp.unlockedTech.includes(t.id))
           if (available.length > 0) {
             const newTech = available[Math.floor(Math.random() * available.length)]
             comp.unlockedTech.push(newTech.id)
-            console.log(`${comp.name} researched ${newTech.name}`)
           }
         }
 
-        // 2. Simple AI Design: Every ~24 turns (2 years), release a "New" version
+        // 2. Simple AI Design
         if (Math.random() > 0.95) {
            const baseModel = comp.models[0]
            const newModel = {
@@ -65,6 +82,7 @@ export const useCompetitorStore = defineStore('competitors', {
              id: `${baseModel.id}-${Date.now()}`,
              name: `${baseModel.name} MkII`,
              price: Math.floor(baseModel.price * 1.1),
+             cost: Math.floor(baseModel.cost * 1.05),
              stats: { 
                pwrRatio: baseModel.stats.pwrRatio + 0.5,
                safety: baseModel.stats.safety + 2,
@@ -73,13 +91,63 @@ export const useCompetitorStore = defineStore('competitors', {
              }
            }
            comp.models.unshift(newModel)
-           if (comp.models.length > 3) comp.models.pop() // Keep fresh
+           if (comp.models.length > 3) comp.models.pop()
            
-           // Gradually increase production capacity
-           comp.productionLimit = Math.floor(comp.productionLimit * 1.2)
+           // Gradually hire more workers
+           if (comp.factories) {
+             comp.factories.forEach(f => {
+               f.employees = Math.floor(f.employees * 1.1)
+             })
+           }
         }
       })
     },
+
+    addToInventory(compId, modelId, territoryId, count) {
+      const comp = this.competitors.find(c => c.id === compId)
+      if (!comp) return
+      if (!comp.regionalInventory) comp.regionalInventory = {}
+      if (!comp.regionalInventory[modelId]) comp.regionalInventory[modelId] = {}
+      if (!comp.regionalInventory[modelId][territoryId]) comp.regionalInventory[modelId][territoryId] = 0
+      comp.regionalInventory[modelId][territoryId] += count
+    },
+
+    removeFromInventory(compId, modelId, territoryId, count) {
+      const comp = this.competitors.find(c => c.id === compId)
+      if (comp && comp.regionalInventory && comp.regionalInventory[modelId]) {
+        const current = comp.regionalInventory[modelId][territoryId] || 0
+        comp.regionalInventory[modelId][territoryId] = Math.max(0, current - count)
+      }
+    },
+
+    processMonthlyFinances(compDataMap) {
+      this.competitors.forEach(comp => {
+        const data = compDataMap[comp.id] || { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0 }
+        
+        const totalExpenses = 
+          data.productionCosts + 
+          (data.shipping || 0) + 
+          (data.salaries || 0) + 
+          (data.maintenance || 0) + 
+          (data.lease || 0) + 
+          (data.research || 0)
+
+        const net = data.income - totalExpenses
+        comp.funds += net
+        
+        comp.lastTurnLedger = {
+          income: data.income,
+          productionCosts: data.productionCosts,
+          shipping: data.shipping || 0,
+          salaries: data.salaries || 0,
+          maintenance: data.maintenance || 0,
+          lease: data.lease || 0,
+          research: data.research || 0,
+          net
+        }
+      })
+    },
+
     updateMarketShare(shares) {
       this.competitors.forEach(comp => {
         comp.marketShare = shares[comp.id] || 0

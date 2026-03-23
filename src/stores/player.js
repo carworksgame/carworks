@@ -30,6 +30,9 @@ export const usePlayerStore = defineStore('player', {
     // Benefits (Global for company)
     benefitsLevel: 10, // 0-100 scale
 
+    // Market Research
+    purchasedReports: {}, // { territoryId: { date, segments, totalPotential } }
+
     ledger: []
   }),
 
@@ -68,8 +71,6 @@ export const usePlayerStore = defineStore('player', {
       if (!factory) return 0
       const satisfaction = state.getFactorySatisfaction(factoryId)
       const baseProd = Math.min(1.5, Math.max(0.1, satisfaction))
-      
-      // Level bonus: 25% boost per level above 1
       const levelBonus = 1 + (factory.level - 1) * 0.25
       return baseProd * levelBonus
     },
@@ -96,12 +97,7 @@ export const usePlayerStore = defineStore('player', {
     },
 
     getUpgradeCost: () => (currentLevel) => {
-      const costs = {
-        1: 50000,
-        2: 125000,
-        3: 300000,
-        4: 750000
-      }
+      const costs = { 1: 50000, 2: 125000, 3: 300000, 4: 750000 }
       return costs[currentLevel] || 0
     }
   },
@@ -132,7 +128,6 @@ export const usePlayerStore = defineStore('player', {
 
       const totalExpenses = Object.values(expenses).reduce((a, b) => a + b, 0)
       const income = turnInfo.salesIncome || 0
-
       const net = income - totalExpenses
       this.funds += net
 
@@ -162,18 +157,10 @@ export const usePlayerStore = defineStore('player', {
       if (this.funds >= territory.unlockCost) {
         this.funds -= territory.unlockCost
         worldStore.unlockTerritory(territory.id)
-        
-        this.showrooms.push({
-          id: Date.now(),
-          territory: territory.id,
-          salesForce: 5,
-          monthlyLease: 1000
-        })
-
+        this.showrooms.push({ id: Date.now(), territory: territory.id, salesForce: 5, monthlyLease: 1000 })
         if (this.factories.length > 0) {
           this.supplyLines[territory.id] = this.factories[0].id
         }
-
         return true
       }
       return false
@@ -198,22 +185,13 @@ export const usePlayerStore = defineStore('player', {
       return false
     },
 
-    hireTechnicians(count) {
-      this.technicians += count
-    },
-
-    fireTechnicians(count) {
-      this.technicians = Math.max(0, this.technicians - count)
-    },
-
-    updateBenefits(level) {
-      this.benefitsLevel = Math.min(100, Math.max(0, level))
-    },
+    hireTechnicians(count) { this.technicians += count },
+    fireTechnicians(count) { this.technicians = Math.max(0, this.technicians - count) },
+    updateBenefits(level) { this.benefitsLevel = Math.min(100, Math.max(0, level)) },
 
     upgradeFactory(factoryId) {
       const factory = this.factories.find(f => f.id === factoryId)
       if (!factory || factory.level >= 5) return false
-      
       const cost = this.getUpgradeCost(factory.level)
       if (this.funds >= cost) {
         this.funds -= cost
@@ -221,6 +199,24 @@ export const usePlayerStore = defineStore('player', {
         return true
       }
       return false
+    },
+
+    buyReport(territoryId, segments, totalPotential) {
+      const cost = 2500
+      if (this.funds >= cost) {
+        this.funds -= cost
+        this.purchasedReports[territoryId] = {
+          date: new Date().toISOString(), // Internal timestamp
+          segments,
+          totalPotential
+        }
+        return true
+      }
+      return false
+    },
+
+    clearReports() {
+      this.purchasedReports = {}
     }
   }
 })

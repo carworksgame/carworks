@@ -1,11 +1,20 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { usePlayerStore } from './player'
+import { useGameStore } from './game'
+import { useWorldStore } from './world'
+
+export const VEHICLE_CLASSES = {
+  ECONOMY: 'Economy',
+  LUXURY: 'Luxury',
+  SPORT: 'Sport',
+  UTILITY: 'Utility'
+}
 
 export const useDesignStore = defineStore('design', {
   state: () => ({
     models: [],
-    activePrototype: null, // { name, components, baseStats, status, results: {} }
-    // Component libraries based on unlocked tech
+    activePrototype: null, // { name, vehicleClass, components, baseStats, status, results: {} }
+    // Component libraries (Base costs in 1908 dollars)
     components: {
       chassis: [
         { id: 'basic-chassis', name: 'Wooden Frame', cost: 200, weight: 500, durability: 20 },
@@ -52,9 +61,17 @@ export const useDesignStore = defineStore('design', {
 
   getters: {
     getUnlockedComponents: (state) => (unlockedTech) => {
+      const worldStore = useWorldStore()
+      const inflation = worldStore.inflationMultiplier
+      
       const filtered = {}
       for (const cat in state.components) {
-        filtered[cat] = state.components[cat].filter(comp => !comp.requires || unlockedTech.includes(comp.requires))
+        filtered[cat] = state.components[cat]
+          .filter(comp => !comp.requires || unlockedTech.includes(comp.requires))
+          .map(comp => ({
+            ...comp,
+            cost: Math.round(comp.cost * inflation) // Apply inflation to base cost
+          }))
       }
       return filtered
     }
@@ -87,20 +104,16 @@ export const useDesignStore = defineStore('design', {
 
     runTest(testId) {
       const playerStore = usePlayerStore()
-      const testFee = 500
+      const testFee = Math.round(500 * useWorldStore().inflationMultiplier)
       if (playerStore.funds < testFee) return false
       playerStore.funds -= testFee
 
-      // Engineering variance (+/- 15%)
       const variance = 0.85 + (Math.random() * 0.3)
       const base = this.activePrototype.stats
 
       if (testId === 'acceleration') {
-        // Result is 0-60 time in seconds. Higher PWR = Lower time.
-        // Base formula: 20 / (PWR/10)
         this.activePrototype.results.acceleration = (20 / (base.pwrRatio / 10 || 1)) * variance
       } else if (testId === 'braking') {
-        // Stopping distance in feet.
         this.activePrototype.results.braking = (200 / (base.safety / 20 || 1)) * variance
       } else if (testId === 'economy') {
         this.activePrototype.results.economy = base.economy * variance
@@ -112,8 +125,8 @@ export const useDesignStore = defineStore('design', {
 
     finalizePrototype() {
       if (!this.activePrototype) return
+      const gameStore = useGameStore()
       
-      // Update stats with "Real" results if tested, otherwise use base
       const finalStats = {
         ...this.activePrototype.stats,
         realEconomy: this.activePrototype.results.economy || this.activePrototype.stats.economy,
@@ -124,12 +137,13 @@ export const useDesignStore = defineStore('design', {
 
       this.models.push({
         name: this.activePrototype.name,
+        vehicleClass: this.activePrototype.vehicleClass,
         cost: this.activePrototype.cost,
         weight: this.activePrototype.weight,
         stats: finalStats,
         components: this.activePrototype.components,
         id: Date.now(),
-        introduced: new Date().getFullYear() 
+        introduced: gameStore.year
       })
       this.activePrototype = null
     },
@@ -139,11 +153,12 @@ export const useDesignStore = defineStore('design', {
     },
 
     saveModel(model) {
-      // Legacy method, might be used by AI or old code
+      const gameStore = useGameStore()
       this.models.push({
         ...model,
+        vehicleClass: model.vehicleClass || VEHICLE_CLASSES.UTILITY,
         id: Date.now(),
-        introduced: new Date().getFullYear()
+        introduced: gameStore.year
       })
     }
   }

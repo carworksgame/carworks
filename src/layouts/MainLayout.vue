@@ -180,6 +180,18 @@
               :label-value="Math.round(settingsStore.masterVolume * 100) + '%'"
             />
           </div>
+
+          <q-separator class="q-my-md" />
+
+          <q-item tag="label" v-ripple>
+            <q-item-section>
+              <q-item-label class="text-weight-bold text-red-9">Developer Mode</q-item-label>
+              <q-item-label caption>Enables advanced simulation analytics and math breakdown.</q-item-label>
+            </q-item-section>
+            <q-item-section side>
+              <q-toggle v-model="debugStore.debugMode" color="red-9" />
+            </q-item-section>
+          </q-item>
         </q-card-section>
 
         <q-card-actions align="right">
@@ -315,6 +327,7 @@ import { useAuthStore } from '../stores/auth'
 import { useSavesStore } from '../stores/saves'
 import { useBankStore } from '../stores/bank'
 import { useSettingsStore } from '../stores/settings'
+import { useDebugStore } from '../stores/debug'
 import { processEndTurn } from '../logic/simulation'
 import { useRouter, useRoute } from 'vue-router'
 
@@ -329,6 +342,7 @@ const authStore = useAuthStore()
 const savesStore = useSavesStore()
 const bankStore = useBankStore()
 const settingsStore = useSettingsStore()
+const debugStore = useDebugStore()
 const router = useRouter()
 const route = useRoute()
 

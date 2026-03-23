@@ -10,10 +10,12 @@
     
     <!-- Navigation Tabs -->
     <q-tabs v-model="tab" dense class="text-grey" active-color="brown-10" indicator-color="brown-10" align="left" narrow-indicator>
-      <q-tab name="ledger" label="Financial Ledger" icon="account_balance_wallet" />
+      <q-tab name="reports" label="Reports" icon="bar_chart" />
       <q-tab name="personnel" label="Personnel" icon="groups" />
+      <q-tab name="research" label="Market Research" icon="analytics" />
       <q-tab name="logistics" label="Logistics" icon="local_shipping" />
       <q-tab name="expansion" label="Global Expansion" icon="public" />
+      <q-tab v-if="debugStore.debugMode" name="debug" label="Sim Analytics" icon="bug_report" class="text-red-9" />
       <q-tab name="bank" label="Commercial Bank" icon="account_balance" />
       <q-tab name="competitors" label="Competition" icon="trending_up" />
     </q-tabs>
@@ -21,60 +23,240 @@
     <q-separator class="q-mb-md" />
 
     <q-tab-panels v-model="tab" animated class="bg-transparent">
-      <!-- LEDGER PANEL -->
-      <q-tab-panel name="ledger" class="q-pa-none">
+
+      <!-- REPORTS PANEL -->
+      <q-tab-panel name="reports" class="q-pa-none">
         <div class="row q-gutter-md">
-          <q-card flat bordered class="col-12 col-md-7">
-            <q-card-section class="bg-brown-10 text-white row items-center">
-              <div class="text-h6">Monthly Ledger</div>
-              <q-space />
-              <div v-if="playerStore.lastMonthPerformance" class="text-subtitle2">
-                Turn {{ playerStore.lastMonthPerformance.turn }}: {{ playerStore.lastMonthPerformance.date }}
-              </div>
+          <q-card flat bordered class="col-12 col-md-3">
+            <q-card-section class="bg-brown-10 text-white">
+              <div class="text-h6">Report Selection</div>
             </q-card-section>
-
-            <q-card-section>
-              <div v-if="!playerStore.lastMonthPerformance" class="text-center q-pa-xl text-grey">
-                Run a turn to see financial reports.
-              </div>
-              <div v-else>
-                <q-list dense separator>
-                  <q-item>
-                    <q-item-section>Gross Income (Sales)</q-item-section>
-                    <q-item-section side class="text-green-9 text-weight-bold">
-                      +${{ playerStore.lastMonthPerformance.income.toLocaleString() }}
-                    </q-item-section>
-                  </q-item>
-
-                  <q-item-label header class="q-pt-md">Monthly Expenses</q-item-label>
-                  
-                  <q-item v-for="(val, exp) in playerStore.lastMonthPerformance.expenses" :key="exp">
-                    <q-item-section class="text-capitalize">{{ exp }}</q-item-section>
-                    <q-item-section side class="text-red-9">
-                      -${{ val.toLocaleString() }}
-                    </q-item-section>
-                  </q-item>
-
-                  <q-separator class="q-my-sm" />
-
-                  <q-item class="bg-grey-3 rounded-borders">
-                    <q-item-section class="text-h6">Net Profit/Loss</q-item-section>
-                    <q-item-section side :class="['text-h6', playerStore.lastMonthPerformance.net >= 0 ? 'text-green-9' : 'text-red-9']">
-                      ${{ playerStore.lastMonthPerformance.net.toLocaleString() }}
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </div>
-            </q-card-section>
+            <q-list separator>
+              <q-item clickable v-ripple :active="selectedReport === 'ledger'" @click="selectedReport = 'ledger'" active-class="bg-brown-1 text-brown-10 text-weight-bold">
+                <q-item-section>Monthly Ledger</q-item-section>
+              </q-item>
+              <q-item clickable v-ripple :active="selectedReport === 'incomeByModel'" @click="selectedReport = 'incomeByModel'" active-class="bg-brown-1 text-brown-10 text-weight-bold">
+                <q-item-section>Income by Model</q-item-section>
+              </q-item>
+              <q-item clickable v-ripple :active="selectedReport === 'incomeByRegion'" @click="selectedReport = 'incomeByRegion'" active-class="bg-brown-1 text-brown-10 text-weight-bold">
+                <q-item-section>Income by Region</q-item-section>
+              </q-item>
+              <q-item clickable v-ripple :active="selectedReport === 'modelReport'" @click="selectedReport = 'modelReport'" active-class="bg-brown-1 text-brown-10 text-weight-bold">
+                <q-item-section>Model Report</q-item-section>
+              </q-item>
+              <q-item clickable v-ripple :active="selectedReport === 'modelComparison'" @click="selectedReport = 'modelComparison'" active-class="bg-brown-1 text-brown-10 text-weight-bold">
+                <q-item-section>Model Comparison</q-item-section>
+              </q-item>
+              <q-item clickable v-ripple :active="selectedReport === 'profitChart'" @click="selectedReport = 'profitChart'" active-class="bg-brown-1 text-brown-10 text-weight-bold">
+                <q-item-section>Profit Chart</q-item-section>
+              </q-item>
+              <q-item clickable v-ripple :active="selectedReport === 'productionChart'" @click="selectedReport = 'productionChart'" active-class="bg-brown-1 text-brown-10 text-weight-bold">
+                <q-item-section>Production Chart</q-item-section>
+              </q-item>
+              <q-item clickable v-ripple :active="selectedReport === 'salesChart'" @click="selectedReport = 'salesChart'" active-class="bg-brown-1 text-brown-10 text-weight-bold">
+                <q-item-section>Sales Chart</q-item-section>
+              </q-item>
+            </q-list>
           </q-card>
 
-          <q-card flat bordered class="col col-md-4">
+          <q-card flat bordered class="col">
+            <q-card-section class="bg-grey-9 text-white row items-center">
+              <div class="text-h6">{{ currentReportTitle }}</div>
+              <q-space />
+              <div class="text-caption">Turn {{ reportsStore.lastTurn.turn || 0 }}</div>
+            </q-card-section>
+            <q-card-section>
+              <!-- 1. Monthly Ledger -->
+              <div v-if="selectedReport === 'ledger'">
+                <div v-if="!playerStore.lastMonthPerformance" class="text-center q-pa-xl text-grey">
+                  Run a turn to see financial reports.
+                </div>
+                <div v-else>
+                  <q-list dense separator>
+                    <q-item>
+                      <q-item-section>Gross Income (Sales)</q-item-section>
+                      <q-item-section side class="text-green-9 text-weight-bold">
+                        +${{ playerStore.lastMonthPerformance.income.toLocaleString() }}
+                      </q-item-section>
+                    </q-item>
+                    <q-item-label header class="q-pt-md">Monthly Expenses</q-item-label>
+                    <q-item v-for="(val, exp) in playerStore.lastMonthPerformance.expenses" :key="exp">
+                      <q-item-section class="text-capitalize">{{ exp }}</q-item-section>
+                      <q-item-section side class="text-red-9">
+                        -${{ val.toLocaleString() }}
+                      </q-item-section>
+                    </q-item>
+                    <q-separator class="q-my-sm" />
+                    <q-item class="bg-grey-3 rounded-borders">
+                      <q-item-section class="text-h6">Net Profit/Loss</q-item-section>
+                      <q-item-section side :class="['text-h6', playerStore.lastMonthPerformance.net >= 0 ? 'text-green-9' : 'text-red-9']">
+                        ${{ playerStore.lastMonthPerformance.net.toLocaleString() }}
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </div>
+              </div>
+
+              <!-- 2. Income By Model -->
+              <div v-if="selectedReport === 'incomeByModel'">
+                <q-list separator v-if="Object.keys(reportsStore.lastTurn.incomeByModel).length > 0">
+                  <q-item v-for="(amount, model) in reportsStore.lastTurn.incomeByModel" :key="model">
+                    <q-item-section>{{ model }}</q-item-section>
+                    <q-item-section side class="text-green-9 text-weight-bold">${{ amount.toLocaleString() }}</q-item-section>
+                  </q-item>
+                </q-list>
+                <div v-else class="text-center q-pa-xl text-grey">No sales data available.</div>
+              </div>
+
+              <!-- 3. Income By Region -->
+              <div v-if="selectedReport === 'incomeByRegion'">
+                <q-list separator v-if="Object.keys(reportsStore.lastTurn.incomeByRegion).length > 0">
+                  <q-item v-for="(amount, region) in reportsStore.lastTurn.incomeByRegion" :key="region">
+                    <q-item-section>{{ region }}</q-item-section>
+                    <q-item-section side class="text-green-9 text-weight-bold">${{ amount.toLocaleString() }}</q-item-section>
+                  </q-item>
+                </q-list>
+                <div v-else class="text-center q-pa-xl text-grey">No sales data available.</div>
+              </div>
+
+              <!-- 4. Model Report -->
+              <div v-if="selectedReport === 'modelReport'">
+                <div v-if="Object.keys(reportsStore.lastTurn.modelReport).length > 0">
+                  <div v-for="(regions, model) in reportsStore.lastTurn.modelReport" :key="model" class="q-mb-md">
+                    <div class="text-subtitle1 text-weight-bold q-mb-sm">{{ model }}</div>
+                    <q-markup-table flat bordered dense>
+                      <thead>
+                        <tr>
+                          <th class="text-left">Region</th>
+                          <th class="text-right">Built</th>
+                          <th class="text-right">Sold</th>
+                          <th class="text-right">Stock (Remaining)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(data, region) in regions" :key="region">
+                          <td class="text-left">{{ region }}</td>
+                          <td class="text-right text-blue-9">{{ data.built }}</td>
+                          <td class="text-right text-green-9">{{ data.sold }}</td>
+                          <td class="text-right text-orange-9">{{ data.stock }}</td>
+                        </tr>
+                      </tbody>
+                    </q-markup-table>
+                  </div>
+                </div>
+                <div v-else class="text-center q-pa-xl text-grey">No production or sales data available.</div>
+              </div>
+
+              <!-- 5. Model Comparison -->
+              <div v-if="selectedReport === 'modelComparison'">
+                <div v-if="Object.keys(reportsStore.lastTurn.modelComparison).length > 0">
+                  <div v-for="(segments, region) in reportsStore.lastTurn.modelComparison" :key="region" class="q-mb-lg">
+                    <div class="text-h6 bg-grey-3 q-pa-sm">{{ region }}</div>
+                    <div v-for="(models, segment) in segments" :key="segment" class="q-ma-md">
+                      <div class="text-subtitle2 text-indigo-9 q-mb-xs">Segment: {{ segment }}</div>
+                      <q-markup-table flat bordered dense>
+                        <thead>
+                          <tr>
+                            <th class="text-left">Model (Owner)</th>
+                            <th class="text-right">Price</th>
+                            <th class="text-right">Desirability</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="m in models" :key="m.model + m.owner" :class="m.owner === 'Player' ? 'bg-blue-1' : ''">
+                            <td class="text-left">{{ m.model }} ({{ m.owner }})</td>
+                            <td class="text-right">${{ m.price.toLocaleString() }}</td>
+                            <td class="text-right">{{ m.desirability.toFixed(2) }}</td>
+                          </tr>
+                        </tbody>
+                      </q-markup-table>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="text-center q-pa-xl text-grey">No competition data available.</div>
+              </div>
+
+              <!-- 6. Profit Chart -->
+              <div v-if="selectedReport === 'profitChart'">
+                <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end" style="height: 300px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
+                  <div v-for="record in reportsStore.history" :key="record.turn" class="col text-center">
+                    <div class="row items-end justify-center" style="height: 250px">
+                      <div v-for="(cData, cId) in record.companies" :key="cId" class="q-mx-xs relative-position"
+                           :style="{ height: getChartHeight(cData.profit, 'profit') + 'px', width: '20px', backgroundColor: getCompanyColor(cId) }">
+                        <q-tooltip>{{ cData.name }}: ${{ cData.profit.toLocaleString() }}</q-tooltip>
+                      </div>
+                    </div>
+                    <div class="text-caption q-mt-sm">{{ record.date }}</div>
+                  </div>
+                </div>
+                <div v-else class="text-center q-pa-xl text-grey">No historical data.</div>
+              </div>
+
+              <!-- 7. Production Chart -->
+              <div v-if="selectedReport === 'productionChart'">
+                <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end" style="height: 300px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
+                  <div v-for="record in reportsStore.history" :key="record.turn" class="col text-center">
+                    <div class="row items-end justify-center" style="height: 250px">
+                      <div v-for="(cData, cId) in record.companies" :key="cId" class="q-mx-xs relative-position"
+                           :style="{ height: getChartHeight(cData.production, 'production') + 'px', width: '20px', backgroundColor: getCompanyColor(cId) }">
+                        <q-tooltip>{{ cData.name }}: {{ cData.production.toLocaleString() }} units</q-tooltip>
+                      </div>
+                    </div>
+                    <div class="text-caption q-mt-sm">{{ record.date }}</div>
+                  </div>
+                </div>
+                <div v-else class="text-center q-pa-xl text-grey">No historical data.</div>
+              </div>
+
+              <!-- 8. Sales Chart -->
+              <div v-if="selectedReport === 'salesChart'">
+                <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end" style="height: 300px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
+                  <div v-for="record in reportsStore.history" :key="record.turn" class="col text-center">
+                    <div class="row items-end justify-center" style="height: 250px">
+                      <div v-for="(cData, cId) in record.companies" :key="cId" class="q-mx-xs relative-position"
+                           :style="{ height: getChartHeight(cData.sales, 'sales') + 'px', width: '20px', backgroundColor: getCompanyColor(cId) }">
+                        <q-tooltip>{{ cData.name }}: {{ cData.sales.toLocaleString() }} units</q-tooltip>
+                      </div>
+                    </div>
+                    <div class="text-caption q-mt-sm">{{ record.date }}</div>
+                  </div>
+                </div>
+                <div v-else class="text-center q-pa-xl text-grey">No historical data.</div>
+              </div>
+
+            </q-card-section>
+          </q-card>
+        </div>
+      </q-tab-panel>
+
+      <!-- DEBUG PANEL (Sim Analytics) -->
+      <q-tab-panel v-if="debugStore.debugMode" name="debug" class="q-pa-none">
+        <div v-if="!debugStore.lastTurnSnapshot" class="text-center q-pa-xl text-grey">
+          Run a turn with Developer Mode active to capture simulation math.
+        </div>
+        <div v-else class="row q-gutter-md">
+
+          <q-card flat bordered class="col-12">
             <q-card-section class="bg-grey-8 text-white">
               <div class="text-h6">World Context</div>
             </q-card-section>
             <q-card-section>
-              <div class="text-subtitle1">Economic Climate: <span class="text-weight-bold">{{ worldStore.economicClimate.toFixed(2) }}x</span></div>
-              <div v-if="worldStore.activeEvents.length > 0">
+              <div class="text-subtitle1 q-mb-md">Economic Climate: <span class="text-weight-bold">{{ worldStore.economicClimate.toFixed(2) }}x</span></div>
+              
+              <div class="text-subtitle2 q-mb-sm text-grey-8">Current Global Demand Segments:</div>
+              <q-list dense class="bg-grey-1 rounded-borders q-pa-sm" style="max-width: 400px">
+                <q-item v-for="(share, cls) in currentMarketSegments" :key="cls" class="q-py-xs">
+                  <q-item-section>
+                    <div class="row items-center">
+                      <span class="text-weight-bold" style="width: 80px">{{ cls }}</span>
+                      <q-linear-progress :value="share" color="brown-5" class="col q-mx-sm" size="8px" />
+                      <span class="text-caption" style="width: 40px">{{ Math.round(share * 100) }}%</span>
+                    </div>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+
+              <div v-if="worldStore.activeEvents.length > 0" class="q-mt-lg">
                 <div class="text-caption q-mt-sm">Active Effects:</div>
                 <div class="row q-gutter-xs">
                   <q-chip v-for="event in worldStore.activeEvents" :key="event.title" dense color="orange" text-color="white" icon="event">
@@ -82,9 +264,149 @@
                   </q-chip>
                 </div>
               </div>
-              <div v-else class="text-caption text-grey q-mt-sm italic">
-                The world is currently stable.
+            </q-card-section>
+          </q-card>
+
+          <!-- AI Rival Finances -->
+          <q-card flat bordered class="col-12">
+            <q-card-section class="bg-indigo-10 text-white">
+              <div class="text-h6">Rival Company Financials (Last Turn)</div>
+            </q-card-section>
+            <q-card-section>
+              <div class="row q-col-gutter-md">
+                <div v-for="comp in competitorStore.competitors" :key="comp.id" class="col-12 col-md-4">
+                  <q-card flat bordered class="bg-indigo-1">
+                    <q-card-section class="q-pb-none">
+                      <div class="text-subtitle1 text-weight-bold">{{ comp.name }}</div>
+                      <div class="text-caption">Total Cash: ${{ comp.funds.toLocaleString() }}</div>
+                    </q-card-section>
+                    <q-card-section>
+                      <q-list dense>
+                        <q-item>
+                          <q-item-section>Income:</q-item-section>
+                          <q-item-section side class="text-green-9 text-weight-bold">+${{ comp.lastTurnLedger.income.toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-item-label header class="q-pt-sm text-indigo-9 text-overline">Expenses</q-item-label>
+                        <q-item>
+                          <q-item-section>Production:</q-item-section>
+                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.productionCosts.toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-item>
+                          <q-item-section>Salaries:</q-item-section>
+                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.salaries.toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-item>
+                          <q-item-section>Shipping:</q-item-section>
+                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.shipping.toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-item>
+                          <q-item-section>Maint/Lease:</q-item-section>
+                          <q-item-section side class="text-red-9">-${{ (comp.lastTurnLedger.maintenance + comp.lastTurnLedger.lease).toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-item>
+                          <q-item-section>Research:</q-item-section>
+                          <q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.research.toLocaleString() }}</q-item-section>
+                        </q-item>
+                        <q-separator class="q-my-xs" />
+                        <q-item class="text-weight-bold">
+                          <q-item-section>Net:</q-item-section>
+                          <q-item-section side :class="comp.lastTurnLedger.net >= 0 ? 'text-green-9' : 'text-red-9'">
+                            ${{ comp.lastTurnLedger.net.toLocaleString() }}
+                          </q-item-section>
+                        </q-item>
+                      </q-list>
+                    </q-card-section>
+                  </q-card>
+                </div>
               </div>
+            </q-card-section>
+          </q-card>
+
+          <!-- Production Breakdown -->
+          <q-card flat bordered class="col-12">
+            <q-card-section class="bg-red-10 text-white">
+              <div class="text-h6">Production Math Breakdown</div>
+            </q-card-section>
+            <q-card-section>
+              <q-markup-table flat dense bordered>
+                <thead>
+                  <tr>
+                    <th class="text-left">Factory Owner</th>
+                    <th class="text-left">Location</th>
+                    <th class="text-right">Max Capacity</th>
+                    <th class="text-right">Total Requested</th>
+                    <th class="text-right">Actual Output</th>
+                    <th class="text-right">Utilization</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(data, fId) in debugStore.lastTurnSnapshot.production" :key="fId">
+                    <td class="text-left">{{ data.owner }}</td>
+                    <td class="text-left">{{ data.location }}</td>
+                    <td class="text-right">{{ Math.round(data.capacity) }}</td>
+                    <td class="text-right">{{ data.totalRequested }}</td>
+                    <td class="text-right">{{ data.actualOutput }}</td>
+                    <td class="text-right">{{ Math.round((data.actualOutput / (data.capacity || 1)) * 100) }}%</td>
+                  </tr>
+                </tbody>
+              </q-markup-table>
+            </q-card-section>
+          </q-card>
+
+          <!-- Sales Breakdown -->
+          <q-card flat bordered class="col-12">
+            <q-card-section class="bg-blue-grey-9 text-white row items-center">
+              <div class="text-h6">Sales & Pricing Math Breakdown</div>
+              <q-space />
+              <div class="text-caption text-italic">Target Price for {{ debugStore.lastTurnSnapshot.year }}: ${{ getBaseMarketPrice(debugStore.lastTurnSnapshot.year).toLocaleString() }}</div>
+            </q-card-section>
+            <q-card-section class="q-pa-none">
+              <q-expansion-item
+                v-for="(tData, tId) in debugStore.lastTurnSnapshot.sales"
+                :key="tId"
+                :label="tData.name"
+                header-class="bg-grey-2"
+              >
+                <div class="q-pa-md">
+                  <div v-for="(sData, sName) in tData.segments" :key="sName" class="q-mb-lg">
+                    <div class="text-subtitle2 text-indigo-9 border-bottom q-mb-sm">
+                      Segment: {{ sName }} (Base Demand: {{ sData.demand }})
+                    </div>
+                    <q-markup-table flat dense bordered>
+                      <thead>
+                        <tr>
+                          <th class="text-left">Model (Owner)</th>
+                          <th class="text-right">Price</th>
+                          <th class="text-right">Sticker Shock</th>
+                          <th class="text-right">Desirability</th>
+                          <th class="text-right">Pool Share</th>
+                          <th class="text-right">Final Sales</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="m in sData.models" :key="m.name" :class="m.owner === 'Player' ? 'bg-blue-1' : ''">
+                          <td class="text-left">
+                            {{ m.name }} ({{ m.owner }})
+                            <q-tooltip v-if="m.pricing">
+                              Affordability Cap: ${{ m.pricing.affordabilityCap.toLocaleString() }}<br>
+                              Price Factor: {{ m.pricing.priceFactor.toFixed(2) }}
+                            </q-tooltip>
+                          </td>
+                          <td class="text-right">${{ m.price.toLocaleString() }}</td>
+                          <td class="text-right">
+                            <q-badge :color="m.pricing?.stickerShock < 1 ? 'negative' : 'positive'">
+                              {{ (m.pricing?.stickerShock * 100).toFixed(0) }}%
+                            </q-badge>
+                          </td>
+                          <td class="text-right">{{ m.desirability.toFixed(4) }}</td>
+                          <td class="text-right">{{ Math.round(m.share * 100) }}%</td>
+                          <td class="text-right text-weight-bold">{{ m.actual }}</td>
+                        </tr>
+                      </tbody>
+                    </q-markup-table>
+                  </div>
+                </div>
+              </q-expansion-item>
             </q-card-section>
           </q-card>
         </div>
@@ -141,7 +463,7 @@
                   <span>Monthly Salary</span>
                   <span class="text-weight-bold">${{ playerStore.salaryPerTechnician.toLocaleString() }}</span>
                 </div>
-                <q-slider v-model="playerStore.salaryPerTechnician" :min="1000" :max="10000" :step="100" label color="blue-7" />
+                <q-slider v-model="playerStore.salaryPerTechnician" :min="10" :max="1000" :step="5" label color="blue-7" />
                 <div class="row justify-between text-caption text-grey-7 q-mt-xs">
                   <span>Market Avg: ${{ getMarketWage('north-america') }}</span>
                   <span :class="getSatisfactionColor(playerStore.getTechnicianSatisfaction)">
@@ -176,7 +498,7 @@
                   <span>Monthly Salary</span>
                   <span class="text-weight-bold">${{ factory.salary.toLocaleString() }}</span>
                 </div>
-                <q-slider v-model="factory.salary" :min="500" :max="5000" :step="50" label color="orange-8" />
+                <q-slider v-model="factory.salary" :min="5" :max="500" :step="1" label color="orange-8" />
                 <div class="row justify-between text-caption text-grey-7 q-mt-xs">
                   <span>Market Avg: ${{ getMarketWage(factory.territory) }}</span>
                   <span :class="getSatisfactionColor(playerStore.getFactorySatisfaction(factory.id))">
@@ -218,6 +540,98 @@
               </div>
             </q-card-section>
           </q-card>
+        </div>
+      </q-tab-panel>
+
+      <!-- MARKET RESEARCH PANEL -->
+      <q-tab-panel name="research" class="q-pa-none">
+        <div class="row q-gutter-md">
+          <!-- Territory List -->
+          <div class="col-12 col-md-4">
+            <q-card flat bordered>
+              <q-card-section class="bg-indigo-10 text-white">
+                <div class="text-h6">Regional Intelligence</div>
+              </q-card-section>
+              <q-list separator>
+                <q-item v-for="t in worldStore.territories.filter(t => t.active)" :key="t.id" clickable @click="selectedResearchId = t.id" :active="selectedResearchId === t.id" active-class="bg-indigo-1">
+                  <q-item-section avatar>
+                    <q-icon name="public" color="indigo" />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>{{ t.name }}</q-item-label>
+                    <q-item-label caption v-if="playerStore.purchasedReports[t.id]">Report Available</q-item-label>
+                    <q-item-label caption v-else class="text-orange-9">No Data - $2,500 to commission</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-icon v-if="playerStore.purchasedReports[t.id]" name="check_circle" color="positive" />
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-card>
+          </div>
+
+          <!-- Report Display -->
+          <div class="col-12 col-md-7">
+            <q-card v-if="!selectedResearchId" flat bordered class="bg-grey-1 flex flex-center" style="height: 400px">
+              <div class="text-center text-grey">
+                <q-icon name="query_stats" size="64px" />
+                <div class="text-h6">Select a region to view analysis</div>
+              </div>
+            </q-card>
+            
+            <q-card v-else-if="!playerStore.purchasedReports[selectedResearchId]" flat bordered class="bg-indigo-1 flex flex-center" style="height: 400px">
+              <div class="text-center">
+                <q-icon name="lock" size="64px" color="indigo-3" />
+                <div class="text-h6 text-indigo-9 q-mt-md">Commission {{ formatTerritoryName(selectedResearchId) }} Report</div>
+                <p class="text-grey-8 q-mb-xl">Our analysts will profile regional wealth, population, and consumer segments.</p>
+                <q-btn color="indigo-10" icon="payments" label="Pay $2,500 for Monthly Intel" size="lg" @click="buyReport(selectedResearchId)" />
+              </div>
+            </q-card>
+
+            <q-card v-else flat bordered>
+              <q-card-section class="bg-indigo-9 text-white row items-center">
+                <div class="text-h6">Intelligence Report: {{ formatTerritoryName(selectedResearchId) }}</div>
+                <q-space />
+                <q-badge color="white" text-color="indigo-9" :label="gameStore.dateString" />
+              </q-card-section>
+
+              <q-card-section class="row q-col-gutter-md">
+                <div class="col-12 col-sm-6">
+                  <div class="text-overline">Regional Profile</div>
+                  <div class="bg-grey-2 q-pa-md rounded-borders">
+                    <div class="row justify-between"><span>Population:</span><span class="text-weight-bold">{{ (getSelectedTerritory(selectedResearchId).population / 1000000).toFixed(1) }}M</span></div>
+                    <div class="row justify-between q-mt-sm"><span>Avg Wealth:</span><span class="text-weight-bold">{{ getSelectedTerritory(selectedResearchId).wealth }}x</span></div>
+                    <div class="row justify-between q-mt-sm text-indigo-9"><span>Total Potential:</span><span class="text-weight-bold">{{ playerStore.purchasedReports[selectedResearchId].totalPotential.toLocaleString() }} units/mo</span></div>
+                  </div>
+                </div>
+
+                <div class="col-12 col-sm-6">
+                  <div class="text-overline">Segment Demand Shares</div>
+                  <div class="bg-grey-1 q-pa-sm rounded-borders">
+                    <div v-for="(share, cls) in playerStore.purchasedReports[selectedResearchId].segments" :key="cls" class="q-mb-sm">
+                      <div class="row justify-between text-caption">
+                        <span>{{ cls }}</span>
+                        <span>{{ Math.round(share * 100) }}%</span>
+                      </div>
+                      <q-linear-progress :value="share" color="indigo-6" size="10px" rounded />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <q-separator class="q-my-md" />
+                  <div class="text-subtitle2 q-mb-sm"><q-icon name="tips_and_updates" color="orange-9" /> Analyst Consumer Insight</div>
+                  <div class="bg-amber-1 q-pa-md rounded-borders border-amber">
+                    <div v-for="(share, cls) in playerStore.purchasedReports[selectedResearchId].segments" :key="'ins-'+cls" class="q-mb-sm">
+                      <div v-if="share > 0.1">
+                        <span class="text-weight-bold">{{ cls }}:</span> {{ getMarketInsight(cls) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </q-card-section>
+            </q-card>
+          </div>
         </div>
       </q-tab-panel>
 
@@ -457,8 +871,12 @@ import { useGameStore } from '../stores/game'
 import { useCompetitorStore } from '../stores/competitors'
 import { useBankStore } from '../stores/bank'
 import { useSavesStore } from '../stores/saves'
+import { useDebugStore } from '../stores/debug'
+import { useReportsStore } from '../stores/reports'
+import { getMarketSegments, getBaseMarketPrice } from '../logic/simulation'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
+import { VEHICLE_CLASSES } from '../stores/design'
 
 const playerStore = usePlayerStore()
 const worldStore = useWorldStore()
@@ -466,18 +884,26 @@ const gameStore = useGameStore()
 const competitorStore = useCompetitorStore()
 const bankStore = useBankStore()
 const savesStore = useSavesStore()
+const debugStore = useDebugStore()
+const reportsStore = useReportsStore()
 const router = useRouter()
 const $q = useQuasar()
 
-const tab = ref('ledger')
+const tab = ref('reports')
+const selectedReport = ref('ledger')
 const confirmReset = ref(false)
 const showFactoryDialog = ref(false)
 const selectedTerritory = ref(null)
 const factoryLocationName = ref('')
+const selectedResearchId = ref(null)
 
 const playerShare = computed(() => {
   const rivalShares = competitorStore.competitors.reduce((acc, c) => acc + c.marketShare, 0)
   return Math.max(0, 100 - rivalShares)
+})
+
+const currentMarketSegments = computed(() => {
+  return getMarketSegments(gameStore.year)
 })
 
 const factoryOptions = computed(() => {
@@ -487,6 +913,42 @@ const factoryOptions = computed(() => {
     territory: f.territory
   }))
 })
+
+const currentReportTitle = computed(() => {
+  const titles = {
+    ledger: 'Monthly Ledger',
+    incomeByModel: 'Income by Model',
+    incomeByRegion: 'Income by Region',
+    modelReport: 'Production & Sales by Model',
+    modelComparison: 'Competitor Model Comparison',
+    profitChart: 'Trailing 6-Month Profit',
+    productionChart: 'Trailing 6-Month Production',
+    salesChart: 'Trailing 6-Month Sales'
+  }
+  return titles[selectedReport.value] || 'Report'
+})
+
+function getChartHeight(value, type) {
+  if (reportsStore.history.length === 0) return 0
+  let max = 0
+  reportsStore.history.forEach(r => {
+    Object.values(r.companies).forEach(c => {
+      if (Math.abs(c[type]) > max) max = Math.abs(c[type])
+    })
+  })
+  if (max === 0) return 0
+  return Math.max(5, (value / max) * 200) // 200px max height, minimum 5px bar
+}
+
+function getCompanyColor(companyId) {
+  const colors = {
+    player: '#4caf50', // green
+    'ford-rival': '#1976d2', // blue
+    'gm-rival': '#f44336', // red
+    'euro-rival': '#ff9800' // orange
+  }
+  return colors[companyId] || '#9e9e9e'
+}
 
 function getMarketWage(territoryId) {
   const t = worldStore.territories.find(t => t.id === territoryId)
@@ -508,6 +970,10 @@ function getSelectedFactoryTerritory(territoryId) {
 
 function formatTerritoryName(id) {
   return worldStore.territories.find(t => t.id === id)?.name || id
+}
+
+function getSelectedTerritory(id) {
+  return worldStore.territories.find(t => t.id === id)
 }
 
 function expandToRegion(territory) {
@@ -545,6 +1011,28 @@ function modernizeFactory(factory) {
       $q.notify({ color: 'positive', message: 'Modernization complete!', icon: 'precision_manufacturing' })
     }
   })
+}
+
+function buyReport(territoryId) {
+  const t = getSelectedTerritory(territoryId)
+  const segments = getMarketSegments(gameStore.year)
+  const totalPotential = Math.floor((t.population / 100000) * t.wealth * worldStore.globalDemandMultiplier)
+  
+  if (playerStore.buyReport(territoryId, segments, totalPotential)) {
+    $q.notify({ color: 'positive', message: 'Report commissioned!', icon: 'analytics' })
+  } else {
+    $q.notify({ color: 'negative', message: 'Insufficient funds for research.' })
+  }
+}
+
+function getMarketInsight(cls) {
+  const insights = {
+    [VEHICLE_CLASSES.ECONOMY]: 'Buyers are extremely sensitive to unit price and monthly fuel costs.',
+    [VEHICLE_CLASSES.LUXURY]: 'Consumers value prestige, high-end features, and safety over affordability.',
+    [VEHICLE_CLASSES.SPORT]: 'Performance is king. Buyers demand high power-to-weight ratios and speed.',
+    [VEHICLE_CLASSES.UTILITY]: 'Industrial and rural buyers focus on durability, torque, and cargo space.'
+  }
+  return insights[cls]
 }
 
 async function resetGame() {

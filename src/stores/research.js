@@ -2,7 +2,7 @@ import { defineStore, acceptHMRUpdate } from 'pinia'
 
 export const useResearchStore = defineStore('research', {
   state: () => ({
-    currentProject: null, // { id: 'inline-4', name: 'Inline 4 Engine', progress: 0, cost: 10000 }
+    activeProjects: [], // Array of { id, name, category, progress, cost, description }
     unlockedTech: ['basic-chassis', 'crank-start', 'tiller-steering'],
     availableTech: [
       { id: 'inline-4', name: 'Inline 4 Engine', category: 'Engine', cost: 12000, description: 'A more powerful and reliable engine.' },
@@ -54,9 +54,8 @@ export const useResearchStore = defineStore('research', {
   persist: true,
 
   getters: {
-    isResearching: (state) => !!state.currentProject,
-    researchProgress: (state) => state.currentProject ? (state.currentProject.progress / state.currentProject.cost) * 100 : 0,
-    totalAssignedTechnicians: (state) => Object.values(state.trackAssignments).reduce((a, b) => a + b, 0)
+    totalAssignedTechnicians: (state) => Object.values(state.trackAssignments).reduce((a, b) => a + b, 0),
+    getProjectByCategory: (state) => (cat) => state.activeProjects.find(p => p.category === cat)
   },
 
   actions: {
@@ -64,11 +63,11 @@ export const useResearchStore = defineStore('research', {
       const newAvailable = this.globalTechPool.filter(tech => {
         const isUnlocked = this.unlockedTech.includes(tech.id)
         const isAlreadyAvailable = this.availableTech.some(at => at.id === tech.id)
-        const isCurrentProject = this.currentProject?.id === tech.id
+        const isActivelyResearching = this.activeProjects.some(p => p.id === tech.id)
         const yearMet = currentYear >= tech.year
         const reqsMet = !tech.requires || this.unlockedTech.includes(tech.requires)
 
-        return !isUnlocked && !isAlreadyAvailable && !isCurrentProject && yearMet && reqsMet
+        return !isUnlocked && !isAlreadyAvailable && !isActivelyResearching && yearMet && reqsMet
       })
 
       if (newAvailable.length > 0) {
@@ -79,29 +78,41 @@ export const useResearchStore = defineStore('research', {
     startProject(techId) {
       const tech = this.availableTech.find(t => t.id === techId)
       if (tech) {
-        this.currentProject = { ...tech, progress: 0 }
+        // Only one project per category
+        const existing = this.activeProjects.find(p => p.category === tech.category)
+        if (!existing) {
+          this.activeProjects.push({ ...tech, progress: 0 })
+          // Remove from available
+          this.availableTech = this.availableTech.filter(t => t.id !== techId)
+        }
       }
     },
 
     progressResearch() {
-      if (this.currentProject) {
-        const category = this.currentProject.category
+      const completedTechNames = []
+      const remainingProjects = []
+
+      this.activeProjects.forEach(project => {
+        const category = project.category
         const assignedTechs = this.trackAssignments[category] || 0
         
         if (assignedTechs > 0) {
           const monthlyProgress = assignedTechs * this.progressPerTech
-          this.currentProject.progress += monthlyProgress
+          project.progress += monthlyProgress
           
-          if (this.currentProject.progress >= this.currentProject.cost) {
-            this.unlockedTech.push(this.currentProject.id)
-            this.availableTech = this.availableTech.filter(t => t.id !== this.currentProject.id)
-            const completedName = this.currentProject.name
-            this.currentProject = null
-            return completedName
+          if (project.progress >= project.cost) {
+            this.unlockedTech.push(project.id)
+            completedTechNames.push(project.name)
+          } else {
+            remainingProjects.push(project)
           }
+        } else {
+          remainingProjects.push(project)
         }
-      }
-      return null
+      })
+
+      this.activeProjects = remainingProjects
+      return completedTechNames
     },
 
     updateAssignment(track, count) {
