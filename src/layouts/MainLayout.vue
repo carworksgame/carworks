@@ -32,7 +32,16 @@
           
           <q-btn flat round icon="person" color="white">
             <q-menu>
-              <q-list style="min-width: 150px">
+              <q-list style="min-width: 180px">
+                <q-item clickable v-close-popup @click="showSettingsDialog = true">
+                  <q-item-section avatar>
+                    <q-icon name="settings" />
+                  </q-item-section>
+                  <q-item-section>Settings</q-item-section>
+                </q-item>
+                
+                <q-separator />
+
                 <q-item clickable v-close-popup @click="onLogout">
                   <q-item-section avatar>
                     <q-icon name="logout" />
@@ -126,6 +135,58 @@
     <q-page-container>
       <router-view />
     </q-page-container>
+
+    <!-- Global Settings Dialog -->
+    <q-dialog v-model="showSettingsDialog">
+      <q-card style="min-width: 350px">
+        <q-card-section class="bg-brown-9 text-white row items-center">
+          <div class="text-h6">Game Settings</div>
+          <q-space />
+          <q-icon name="volume_up" size="sm" />
+        </q-card-section>
+
+        <q-card-section class="q-pa-md">
+          <div class="text-subtitle2 q-mb-md">Audio Preferences</div>
+          
+          <q-item tag="label" v-ripple>
+            <q-item-section>
+              <q-item-label>Sound Effects</q-item-label>
+              <q-item-label caption>UI clicks and mechanical noises</q-item-label>
+            </q-item-section>
+            <q-item-section side>
+              <q-toggle v-model="settingsStore.sfxEnabled" color="brown-9" />
+            </q-item-section>
+          </q-item>
+
+          <q-item tag="label" v-ripple>
+            <q-item-section>
+              <q-item-label>Background Music</q-item-label>
+              <q-item-label caption>Department atmospheric soundtracks</q-item-label>
+            </q-item-section>
+            <q-item-section side>
+              <q-toggle v-model="settingsStore.musicEnabled" color="brown-9" />
+            </q-item-section>
+          </q-item>
+
+          <div class="q-px-md q-mt-lg">
+            <div class="text-caption text-grey-7">Master Volume</div>
+            <q-slider
+              v-model="settingsStore.masterVolume"
+              :min="0"
+              :max="1"
+              :step="0.05"
+              color="brown-9"
+              label
+              :label-value="Math.round(settingsStore.masterVolume * 100) + '%'"
+            />
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="Done" color="brown-9" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <!-- News Flash Dialog -->
     <q-dialog v-model="showNewsDialog">
@@ -253,6 +314,7 @@ import { useCompetitorStore } from '../stores/competitors'
 import { useAuthStore } from '../stores/auth'
 import { useSavesStore } from '../stores/saves'
 import { useBankStore } from '../stores/bank'
+import { useSettingsStore } from '../stores/settings'
 import { processEndTurn } from '../logic/simulation'
 import { useRouter, useRoute } from 'vue-router'
 
@@ -266,6 +328,7 @@ const competitorStore = useCompetitorStore()
 const authStore = useAuthStore()
 const savesStore = useSavesStore()
 const bankStore = useBankStore()
+const settingsStore = useSettingsStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -275,6 +338,7 @@ const confirmEndTurn = ref(false)
 const isProcessingTurn = ref(false)
 const showBankruptDialog = ref(false)
 const showVictoryDialog = ref(false)
+const showSettingsDialog = ref(false)
 
 const nextMonthString = computed(() => {
   let nextMonth = gameStore.month + 1
@@ -293,15 +357,9 @@ function toggleLeftDrawer () {
 
 async function handleEndTurn () {
   isProcessingTurn.value = true
-  
-  // Artificial delay for the "fanfare" effect
   await new Promise(resolve => setTimeout(resolve, 1500))
-  
   const { newsEvent, gameStatus } = processEndTurn()
-  
-  // Wait a bit more before fading back in
   await new Promise(resolve => setTimeout(resolve, 500))
-  
   isProcessingTurn.value = false
   
   if (gameStatus === 'bankrupt') {
