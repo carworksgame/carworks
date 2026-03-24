@@ -159,7 +159,7 @@
                           </tr>
                         </thead>
                         <tbody>
-                          <tr v-for="m in models" :key="m.model + m.owner" :class="m.owner === 'Player' ? 'bg-blue-1' : ''">
+                          <tr v-for="m in models" :key="m.model + m.owner" :class="m.owner === playerStore.companyName ? 'bg-blue-1' : ''">
                             <td class="text-left">{{ m.model }} ({{ m.owner }})</td>
                             <td class="text-right">${{ m.price.toLocaleString() }}</td>
                             <td class="text-right">{{ m.desirability.toFixed(2) }}</td>
@@ -173,26 +173,35 @@
               </div>
 
               <div v-if="selectedReport === 'profitChart'">
-                <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end" style="height: 300px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
-                  <div v-for="record in reportsStore.history" :key="record.turn" class="col text-center">
-                    <div class="row items-end justify-center" style="height: 250px">
-                      <div v-for="(cData, cId) in record.companies" :key="cId" class="q-mx-xs relative-position"
-                           :style="{ height: getChartHeight(cData.profit, 'profit') + 'px', width: '20px', backgroundColor: getCompanyColor(cId) }">
-                        <q-tooltip>{{ cData.name }}: ${{ cData.profit.toLocaleString() }}</q-tooltip>
+                <div v-if="reportsStore.history.length > 0" class="relative-position q-pa-md bg-white rounded-borders shadow-1" style="height: 300px; border: 1px solid #ddd;">
+                  <!-- Zero Line Baseline -->
+                  <div class="absolute-full flex flex-center no-pointer-events">
+                    <div style="width: 100%; height: 1px; border-top: 1px dashed #999; z-index: 1;"></div>
+                  </div>
+
+                  <div class="row q-gutter-sm justify-center full-height">
+                    <div v-for="record in reportsStore.history" :key="record.turn" class="col text-center full-height relative-position">
+                      <div class="row items-center justify-center relative-position full-height" style="width: 100%; z-index: 2;">
+                        <!-- Container for company bars in this turn -->
+                        <div v-for="(cData, cId) in record.companies" :key="cId" class="q-mx-xs relative-position" style="height: 100%; width: 20px;">
+                          <div :style="getChartStyle(cData.profit, 'profit', cId)">
+                            <q-tooltip>{{ cData.name }}: ${{ cData.profit.toLocaleString() }}</q-tooltip>
+                          </div>
+                        </div>
                       </div>
+                      <div class="absolute-bottom text-caption full-width" style="bottom: -20px">{{ record.date }}</div>
                     </div>
-                    <div class="text-caption q-mt-sm">{{ record.date }}</div>
                   </div>
                 </div>
                 <div v-else class="text-center q-pa-xl text-grey">No historical data.</div>
               </div>
 
               <div v-if="selectedReport === 'productionChart'">
-                <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end" style="height: 300px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
+                <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end bg-white q-pa-md rounded-borders shadow-1" style="height: 300px; border: 1px solid #ddd;">
                   <div v-for="record in reportsStore.history" :key="record.turn" class="col text-center">
                     <div class="row items-end justify-center" style="height: 250px">
                       <div v-for="(cData, cId) in record.companies" :key="cId" class="q-mx-xs relative-position"
-                           :style="{ height: getChartHeight(cData.production, 'production') + 'px', width: '20px', backgroundColor: getCompanyColor(cId) }">
+                           :style="{ height: (getChartHeight(cData.production, 'production')) + '%', width: '20px', backgroundColor: getCompanyColor(cId), borderRadius: '2px 2px 0 0' }">
                         <q-tooltip>{{ cData.name }}: {{ cData.production.toLocaleString() }} units</q-tooltip>
                       </div>
                     </div>
@@ -203,11 +212,11 @@
               </div>
 
               <div v-if="selectedReport === 'salesChart'">
-                <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end" style="height: 300px; padding-bottom: 20px; border-bottom: 1px solid #ccc;">
+                <div v-if="reportsStore.history.length > 0" class="row q-gutter-md justify-center items-end bg-white q-pa-md rounded-borders shadow-1" style="height: 300px; border: 1px solid #ddd;">
                   <div v-for="record in reportsStore.history" :key="record.turn" class="col text-center">
                     <div class="row items-end justify-center" style="height: 250px">
                       <div v-for="(cData, cId) in record.companies" :key="cId" class="q-mx-xs relative-position"
-                           :style="{ height: getChartHeight(cData.sales, 'sales') + 'px', width: '20px', backgroundColor: getCompanyColor(cId) }">
+                           :style="{ height: (getChartHeight(cData.sales, 'sales')) + '%', width: '20px', backgroundColor: getCompanyColor(cId), borderRadius: '2px 2px 0 0' }">
                         <q-tooltip>{{ cData.name }}: {{ cData.sales.toLocaleString() }} units</q-tooltip>
                       </div>
                     </div>
@@ -309,20 +318,33 @@
 
           <!-- R&D Department -->
           <q-card flat bordered class="col-12 col-md-4">
-            <q-card-section class="bg-blue-10 text-white">
+            <q-card-section class="bg-blue-10 text-white row items-center">
               <div class="text-h6">R&D Department</div>
-              <div class="text-caption">Global Laboratory</div>
+              <q-space />
+              <q-badge color="white" text-color="blue-10" label="Global" />
             </q-card-section>
 
             <q-card-section>
-              <div class="q-mb-md">
-                <div class="row justify-between items-center q-mb-sm">
-                  <span class="text-subtitle2">Technicians: <span class="text-h6 text-blue-9">{{ playerStore.technicians }}</span></span>
-                  <div class="row q-gutter-xs">
-                    <q-btn round dense color="red" icon="remove" @click="playerStore.fireTechnicians(1)" :disabled="playerStore.technicians <= 0" />
-                    <q-btn round dense color="green" icon="add" @click="playerStore.hireTechnicians(1)" />
-                  </div>
+              <div class="row items-center justify-around q-mb-md bg-blue-1 q-pa-sm rounded-borders">
+                <div class="text-center">
+                  <div class="text-h6 text-blue-9">{{ playerStore.totalTechnicians }}</div>
+                  <div class="text-overline text-grey-7">Total</div>
                 </div>
+                <q-separator vertical inset />
+                <div class="text-center">
+                  <div class="text-h6 text-orange-9">{{ playerStore.idleTechnicians }}</div>
+                  <div class="text-overline text-grey-7">Idle</div>
+                </div>
+              </div>
+
+              <div class="row q-col-gutter-sm items-center q-mb-md">
+                <q-input v-model.number="techHiringInput" type="number" outlined dense label="Technicians" class="col" />
+                <q-btn color="green-9" label="Hire" class="col-auto" @click="handleHireTech" />
+                <q-btn color="red-9" label="Layoff" outline class="col-auto" @click="handleLayoffTech" />
+              </div>
+              
+              <div class="text-caption text-grey-7 q-mb-lg text-center">
+                Local Talent Pool: {{ getSelectedTerritory('north-america')?.talentPool }} people
               </div>
 
               <q-separator class="q-my-sm" />
@@ -354,13 +376,29 @@
             </q-card-section>
 
             <q-card-section>
-              <div class="q-mb-md">
-                <div class="row justify-between text-caption">
-                  <span>Employees</span>
-                  <span>{{ factory.employees }} / {{ factory.maxEmployees }}</span>
+              <div class="row items-center justify-around q-mb-md bg-blue-grey-1 q-pa-sm rounded-borders">
+                <div class="text-center">
+                  <div class="text-h6 text-blue-grey-9">{{ factory.totalWorkers }}</div>
+                  <div class="text-overline text-grey-7">Total</div>
                 </div>
-                <q-slider v-model="factory.employees" :min="0" :max="factory.maxEmployees" :step="10" label color="blue-grey-6" />
+                <q-separator vertical inset />
+                <div class="text-center">
+                  <div class="text-h6 text-orange-9">{{ factory.idleWorkers }}</div>
+                  <div class="text-overline text-grey-7">Idle</div>
+                </div>
               </div>
+
+              <div class="row q-col-gutter-sm items-center q-mb-md">
+                <q-input v-model.number="factoryHiringInputs[factory.id]" type="number" outlined dense label="Workers" class="col" />
+                <q-btn color="green-9" label="Hire" class="col-auto" @click="handleHireWorkers(factory)" />
+                <q-btn color="red-9" label="Layoff" outline class="col-auto" @click="handleLayoffWorkers(factory)" />
+              </div>
+
+              <div class="text-caption text-grey-7 q-mb-lg text-center">
+                Regional Talent Pool: {{ getSelectedTerritory(factory.territory)?.talentPool }} people
+              </div>
+
+              <q-separator class="q-my-sm" />
 
               <div class="q-mb-md">
                 <div class="row justify-between text-caption">
@@ -377,11 +415,11 @@
               </div>
 
               <div class="q-mb-sm">
-                <div class="text-caption">Automation & Output</div>
+                <div class="text-caption">Output Efficiency</div>
                 <q-linear-progress :value="playerStore.getFactoryProductivity(factory.id) / 2.0" :color="getSatisfactionColor(playerStore.getFactorySatisfaction(factory.id))" size="10px" rounded />
                 <div class="row justify-between text-caption text-grey-7 q-mt-xs">
-                   <span>Unit Cost: -{{ (factory.level - 1) * 5 }}%</span>
-                   <span class="text-weight-bold">Output: {{ (factory.employees * playerStore.getFactoryProductivity(factory.id)).toFixed(0) }} units</span>
+                   <span>Unit Cost Mod: -{{ (factory.level - 1) * 5 }}%</span>
+                   <span class="text-weight-bold">Max Output: {{ (factory.totalWorkers * playerStore.getFactoryProductivity(factory.id)).toFixed(0) }} units</span>
                 </div>
               </div>
 
@@ -390,22 +428,12 @@
               <div v-if="factory.level < 5">
                 <q-btn 
                   color="indigo-10" 
-                  class="full-width" 
+                  class="full-width q-mt-sm" 
                   label="Modernize Factory" 
                   icon="precision_manufacturing"
                   :disabled="playerStore.funds < playerStore.getUpgradeCost(factory.level)"
                   @click="modernizeFactory(factory)"
-                >
-                  <q-tooltip>
-                    Upgrade to Level {{ factory.level + 1 }}. Cost: ${{ playerStore.getUpgradeCost(factory.level).toLocaleString() }}
-                  </q-tooltip>
-                </q-btn>
-                <div class="text-center text-caption text-indigo-9 q-mt-xs">
-                  Next Level: ${{ playerStore.getUpgradeCost(factory.level).toLocaleString() }}
-                </div>
-              </div>
-              <div v-else class="text-center text-positive text-weight-bold text-overline">
-                FULLY MODERNIZED (MAX LEVEL)
+                />
               </div>
             </q-card-section>
           </q-card>
@@ -415,7 +443,6 @@
       <!-- MARKET RESEARCH PANEL -->
       <q-tab-panel name="research" class="q-pa-none">
         <div class="row q-gutter-md">
-          <!-- Territory List -->
           <div class="col-12 col-md-4">
             <q-card flat bordered>
               <q-card-section class="bg-indigo-10 text-white">
@@ -439,7 +466,6 @@
             </q-card>
           </div>
 
-          <!-- Report Display -->
           <div class="col-12 col-md-7">
             <q-card v-if="!selectedResearchId" flat bordered class="bg-grey-1 flex flex-center" style="height: 400px">
               <div class="text-center text-grey">
@@ -447,7 +473,6 @@
                 <div class="text-h6">Select a region to view analysis</div>
               </div>
             </q-card>
-            
             <q-card v-else-if="!playerStore.purchasedReports[selectedResearchId]" flat bordered class="bg-indigo-1 flex flex-center" style="height: 400px">
               <div class="text-center">
                 <q-icon name="lock" size="64px" color="indigo-3" />
@@ -456,14 +481,12 @@
                 <q-btn color="indigo-10" icon="payments" label="Pay $2,500 for Monthly Intel" size="lg" @click="buyReport(selectedResearchId)" />
               </div>
             </q-card>
-
             <q-card v-else flat bordered>
               <q-card-section class="bg-indigo-9 text-white row items-center">
                 <div class="text-h6">Intelligence Report: {{ formatTerritoryName(selectedResearchId) }}</div>
                 <q-space />
                 <q-badge color="white" text-color="indigo-9" :label="gameStore.dateString" />
               </q-card-section>
-
               <q-card-section class="row q-col-gutter-md">
                 <div class="col-12 col-sm-6">
                   <div class="text-overline">Regional Profile</div>
@@ -473,7 +496,6 @@
                     <div class="row justify-between q-mt-sm text-indigo-9"><span>Total Potential:</span><span class="text-weight-bold">{{ playerStore.purchasedReports[selectedResearchId].totalPotential.toLocaleString() }} units/mo</span></div>
                   </div>
                 </div>
-
                 <div class="col-12 col-sm-6">
                   <div class="text-overline">Segment Demand Shares</div>
                   <div class="bg-grey-1 q-pa-sm rounded-borders">
@@ -486,7 +508,6 @@
                     </div>
                   </div>
                 </div>
-
                 <div class="col-12">
                   <q-separator class="q-my-md" />
                   <div class="text-subtitle2 q-mb-sm"><q-icon name="tips_and_updates" color="orange-9" /> Analyst Consumer Insight</div>
@@ -501,6 +522,78 @@
               </q-card-section>
             </q-card>
           </div>
+        </div>
+      </q-tab-panel>
+
+      <!-- LOGISTICS PANEL -->
+      <q-tab-panel name="logistics" class="q-pa-none">
+        <div class="row q-gutter-md">
+          <q-card v-for="territory in worldStore.territories.filter(t => t.active)" :key="territory.id" flat bordered class="col-12 col-md-5">
+            <q-card-section class="bg-indigo-8 text-white row items-center">
+              <div class="text-h6">{{ territory.name }} Supply</div>
+              <q-space />
+              <q-icon name="local_shipping" size="sm" />
+            </q-card-section>
+            <q-card-section>
+              <div class="text-subtitle2 q-mb-sm">Source Factory:</div>
+              <q-select
+                v-model="playerStore.supplyLines[territory.id]"
+                :options="factoryOptions"
+                option-label="label"
+                option-value="value"
+                emit-value
+                map-options
+                outlined dense
+                label="Select Supplier"
+              />
+              <div class="q-mt-md bg-grey-2 q-pa-sm rounded-borders">
+                <div class="row justify-between">
+                  <span>Unit Shipping Cost:</span>
+                  <span class="text-weight-bold text-indigo-9">
+                    ${{ worldStore.getShippingCost(getSelectedFactoryTerritory(territory.id), territory.id) }}
+                  </span>
+                </div>
+                <div class="text-caption text-grey italic q-mt-xs">
+                  Distance from {{ formatTerritoryName(getSelectedFactoryTerritory(territory.id)) }} to {{ territory.name }}
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+        </div>
+      </q-tab-panel>
+
+      <!-- EXPANSION PANEL -->
+      <q-tab-panel name="expansion" class="q-pa-none">
+        <div class="row q-gutter-md">
+          <q-card v-for="territory in worldStore.territories" :key="territory.id" flat bordered class="col-12 col-sm-6 col-md-3">
+            <q-card-section :class="[territory.active ? 'bg-green-7' : 'bg-grey-7', 'text-white']">
+              <div class="text-h6">{{ territory.name }}</div>
+              <q-badge v-if="territory.active" color="white" text-color="green" label="ESTABLISHED" />
+              <q-badge v-else color="white" text-color="grey-8" label="LOCKED" />
+            </q-card-section>
+            <q-card-section>
+              <div class="row justify-between q-mb-sm">
+                <span>Population:</span>
+                <span class="text-weight-bold">{{ (territory.population / 1000000).toFixed(1) }}M</span>
+              </div>
+              <div class="row justify-between q-mb-sm">
+                <span>Market Wealth:</span>
+                <span class="text-weight-bold">{{ territory.wealth.toFixed(1) }}x</span>
+              </div>
+              <div v-if="territory.active" class="q-mt-md">
+                <div class="text-subtitle2 q-mb-sm">Local Infrastructure</div>
+                <div class="text-caption">
+                   Factories: {{ playerStore.factories.filter(f => f.territory === territory.id).length }}<br>
+                   Showrooms: {{ playerStore.showrooms.filter(s => s.territory === territory.id).length }}
+                </div>
+                <q-btn outline dense color="blue-grey" icon="add_business" label="Build Factory" class="full-width q-mt-sm" @click="openFactoryDialog(territory)" />
+              </div>
+              <div v-else class="q-mt-md">
+                <div class="text-subtitle2 text-grey-7 q-mb-sm">Expansion Cost: ${{ territory.unlockCost.toLocaleString() }}</div>
+                <q-btn color="green-8" label="Expand to Region" class="full-width" :disabled="playerStore.funds < territory.unlockCost" @click="expandToRegion(territory)" />
+              </div>
+            </q-card-section>
+          </q-card>
         </div>
       </q-tab-panel>
 
@@ -656,7 +749,7 @@
                         </tr>
                       </thead>
                       <tbody>
-                        <tr v-for="m in sData.models" :key="m.name" :class="m.owner === 'Player' ? 'bg-blue-1' : ''">
+                        <tr v-for="m in sData.models" :key="m.name" :class="m.owner === playerStore.companyName ? 'bg-blue-1' : ''">
                           <td class="text-left">
                             {{ m.name }} ({{ m.owner }})
                             <q-tooltip v-if="m.pricing">
@@ -684,112 +777,19 @@
         </div>
       </q-tab-panel>
 
-      <!-- LOGISTICS PANEL -->
-      <q-tab-panel name="logistics" class="q-pa-none">
-        <div class="row q-gutter-md">
-          <q-card v-for="territory in worldStore.territories.filter(t => t.active)" :key="territory.id" flat bordered class="col-12 col-md-5">
-            <q-card-section class="bg-indigo-8 text-white row items-center">
-              <div class="text-h6">{{ territory.name }} Supply</div>
-              <q-space />
-              <q-icon name="local_shipping" size="sm" />
-            </q-card-section>
-
-            <q-card-section>
-              <div class="text-subtitle2 q-mb-sm">Source Factory:</div>
-              <q-select
-                v-model="playerStore.supplyLines[territory.id]"
-                :options="factoryOptions"
-                option-label="label"
-                option-value="value"
-                emit-value
-                map-options
-                outlined dense
-                label="Select Supplier"
-              />
-              
-              <div class="q-mt-md bg-grey-2 q-pa-sm rounded-borders">
-                <div class="row justify-between">
-                  <span>Unit Shipping Cost:</span>
-                  <span class="text-weight-bold text-indigo-9">
-                    ${{ worldStore.getShippingCost(getSelectedFactoryTerritory(territory.id), territory.id) }}
-                  </span>
-                </div>
-                <div class="text-caption text-grey italic q-mt-xs">
-                  Distance from {{ formatTerritoryName(getSelectedFactoryTerritory(territory.id)) }} to {{ territory.name }}
-                </div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
-      </q-tab-panel>
-
-      <!-- EXPANSION PANEL -->
-      <q-tab-panel name="expansion" class="q-pa-none">
-        <div class="row q-gutter-md">
-          <q-card v-for="territory in worldStore.territories" :key="territory.id" flat bordered class="col-12 col-sm-6 col-md-3">
-            <q-card-section :class="[territory.active ? 'bg-green-7' : 'bg-grey-7', 'text-white']">
-              <div class="text-h6">{{ territory.name }}</div>
-              <q-badge v-if="territory.active" color="white" text-color="green" label="ESTABLISHED" />
-              <q-badge v-else color="white" text-color="grey-8" label="LOCKED" />
-            </q-card-section>
-
-            <q-card-section>
-              <div class="row justify-between q-mb-sm">
-                <span>Population:</span>
-                <span class="text-weight-bold">{{ (territory.population / 1000000).toFixed(1) }}M</span>
-              </div>
-              <div class="row justify-between q-mb-sm">
-                <span>Market Wealth:</span>
-                <span class="text-weight-bold">{{ territory.wealth.toFixed(1) }}x</span>
-              </div>
-              
-              <div v-if="territory.active" class="q-mt-md">
-                <div class="text-subtitle2 q-mb-sm">Local Infrastructure</div>
-                <div class="text-caption">
-                   Factories: {{ playerStore.factories.filter(f => f.territory === territory.id).length }}<br>
-                   Showrooms: {{ playerStore.showrooms.filter(s => s.territory === territory.id).length }}
-                </div>
-                <q-btn 
-                  outline 
-                  dense 
-                  color="blue-grey" 
-                  icon="add_business" 
-                  label="Build Factory" 
-                  class="full-width q-mt-sm"
-                  @click="openFactoryDialog(territory)"
-                />
-              </div>
-              <div v-else class="q-mt-md">
-                <div class="text-subtitle2 text-grey-7 q-mb-sm">Expansion Cost: ${{ territory.unlockCost.toLocaleString() }}</div>
-                <q-btn 
-                  color="green-8" 
-                  label="Expand to Region" 
-                  class="full-width"
-                  :disabled="playerStore.funds < territory.unlockCost"
-                  @click="expandToRegion(territory)"
-                />
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
-      </q-tab-panel>
-
       <!-- BANK PANEL -->
       <q-tab-panel name="bank" class="q-pa-none">
         <div class="row q-gutter-md">
-          <!-- Loan Section -->
           <q-card flat bordered class="col-12 col-md-5">
             <q-card-section class="bg-red-10 text-white">
               <div class="text-h6">Commercial Loans</div>
               <div class="text-caption">Current Rate: {{ (bankStore.interestRateLoan * 100).toFixed(1) }}% APR</div>
             </q-card-section>
-            
             <q-card-section class="q-pa-lg">
               <div class="row justify-between items-center q-mb-lg">
                 <div class="text-subtitle1 text-grey-7">Total Debt:</div>
                 <div class="text-h4 text-red-9 text-weight-bolder">${{ bankStore.loanBalance.toLocaleString() }}</div>
               </div>
-
               <div v-if="bankStore.loanBalance > 0" class="bg-red-1 q-pa-md rounded-borders q-mb-lg">
                 <div class="row justify-between">
                   <span>Next Monthly Payment:</span>
@@ -802,7 +802,6 @@
                   </q-badge>
                 </div>
               </div>
-
               <div class="row q-gutter-sm">
                 <q-btn color="red-9" label="Take $10k Loan" class="col" @click="bankStore.takeLoan(10000)" />
                 <q-btn color="green-9" label="Repay $10k" class="col" :disabled="bankStore.loanBalance < 10000" @click="bankStore.repayLoan(10000)" />
@@ -816,20 +815,17 @@
               <div class="text-h6">Company Savings</div>
               <div class="text-caption">Current Rate: {{ (bankStore.interestRateSavings * 100).toFixed(1) }}% APR</div>
             </q-card-section>
-
             <q-card-section class="q-pa-lg">
               <div class="row justify-between items-center q-mb-lg">
                 <div class="text-subtitle1 text-grey-7">Account Balance:</div>
                 <div class="text-h4 text-green-9 text-weight-bolder">${{ bankStore.savingsBalance.toLocaleString() }}</div>
               </div>
-
               <div class="bg-green-1 q-pa-md rounded-borders q-mb-lg">
                 <div class="row justify-between">
                   <span>Est. Monthly Interest:</span>
                   <span class="text-weight-bold">+${{ bankStore.monthlySavingsInterest.toLocaleString() }}</span>
                 </div>
               </div>
-
               <div class="row q-gutter-sm items-center">
                 <q-input v-model.number="savingsAmount" type="number" dense outlined label="Amount" class="col" />
                 <q-btn color="green-9" label="Deposit" class="col-auto" :disabled="!savingsAmount || savingsAmount <= 0" @click="handleDeposit" />
@@ -856,7 +852,6 @@
               </div>
             </q-card-section>
           </q-card>
-
           <q-card flat bordered class="col-12 col-sm-2 bg-blue-1">
             <q-card-section class="text-center">
               <div class="text-overline">Your Share</div>
@@ -885,7 +880,6 @@
           <q-avatar icon="warning" color="red" text-color="white" />
           <span class="q-ml-sm">Are you sure you want to LIQUIDATE? This will permanently delete your cloud save.</span>
         </q-card-section>
-
         <q-card-actions align="right">
           <q-btn flat label="Cancel" color="primary" v-close-popup />
           <q-btn flat label="Confirm Liquidation" color="red" @click="resetGame" v-close-popup />
@@ -899,11 +893,9 @@
           <div class="text-h6">New Factory in {{ selectedTerritory?.name }}</div>
           <div class="text-subtitle2 text-grey-7">Cost: $25,000</div>
         </q-card-section>
-
         <q-card-section class="q-pt-none">
-          <q-input dense v-model="factoryLocationName" label="Location Name (e.g. London, Tokyo)" autofocus @keyup.enter="buildFactory" />
+          <q-input dense v-model="factoryLocationName" label="Location Name" autofocus @keyup.enter="buildFactory" />
         </q-card-section>
-
         <q-card-actions align="right" class="text-primary">
           <q-btn flat label="Cancel" v-close-popup />
           <q-btn flat label="Build" @click="buildFactory" :disabled="!factoryLocationName" />
@@ -949,6 +941,10 @@ const selectedTerritory = ref(null)
 const factoryLocationName = ref('')
 const selectedResearchId = ref(null)
 
+// Personnel Hiring Inputs
+const techHiringInput = ref(0)
+const factoryHiringInputs = ref({})
+
 const playerShare = computed(() => {
   const rivalShares = competitorStore.competitors.reduce((acc, c) => acc + c.marketShare, 0)
   return Math.max(0, 100 - rivalShares)
@@ -979,7 +975,6 @@ const currentReportTitle = computed(() => {
   }
   return titles[selectedReport.value] || 'Report'
 })
-
 function getChartHeight(value, type) {
   if (reportsStore.history.length === 0) return 0
   let max = 0
@@ -989,9 +984,32 @@ function getChartHeight(value, type) {
     })
   })
   if (max === 0) return 0
-  // Value can be negative for profit
   const absValue = Math.abs(value)
-  return Math.max(5, (absValue / max) * 200)
+  return Math.max(2, (absValue / max) * 100) // Returns percentage 0-100
+}
+
+function getChartStyle(value, type, companyId) {
+  const heightPercent = getChartHeight(value, type)
+  const color = getCompanyColor(companyId)
+  
+  const style = {
+    height: (heightPercent / 2) + '%', // Each side gets 50% max
+    width: '20px',
+    backgroundColor: color,
+    position: 'absolute',
+    left: '50%',
+    transform: 'translateX(-50%)'
+  }
+
+  if (value >= 0) {
+    style.bottom = '50%'
+    style.borderRadius = '2px 2px 0 0'
+  } else {
+    style.top = '50%'
+    style.borderRadius = '0 0 2px 2px'
+  }
+
+  return style
 }
 
 function getCompanyColor(companyId) {
@@ -1098,7 +1116,6 @@ function buyReport(territoryId) {
   const t = getSelectedTerritory(territoryId)
   const segments = getMarketSegments(gameStore.year)
   const totalPotential = Math.floor((t.population / 100000) * t.wealth * worldStore.globalDemandMultiplier)
-  
   if (playerStore.buyReport(territoryId, segments, totalPotential)) {
     $q.notify({ color: 'positive', message: 'Report commissioned!', icon: 'analytics' })
   } else {
@@ -1117,25 +1134,63 @@ function getMarketInsight(cls) {
 }
 
 const savingsAmount = ref(0)
-
 function handleDeposit() {
   if (savingsAmount.value > playerStore.funds) {
-    $q.notify({ color: 'negative', message: 'You do not have enough funds to deposit that amount.' })
+    $q.notify({ color: 'negative', message: 'You do not have enough funds.' })
     return
   }
   bankStore.deposit(savingsAmount.value)
-  $q.notify({ color: 'positive', message: `Deposited $${savingsAmount.value.toLocaleString()} to savings.` })
+  $q.notify({ color: 'positive', message: 'Deposited.' })
   savingsAmount.value = 0
 }
-
 function handleWithdraw() {
   if (savingsAmount.value > bankStore.savingsBalance) {
-    $q.notify({ color: 'negative', message: 'You do not have enough savings to withdraw that amount.' })
+    $q.notify({ color: 'negative', message: 'You do not have enough savings.' })
     return
   }
   bankStore.withdraw(savingsAmount.value)
-  $q.notify({ color: 'positive', message: `Withdrew $${savingsAmount.value.toLocaleString()} from savings.` })
+  $q.notify({ color: 'positive', message: 'Withdrew.' })
   savingsAmount.value = 0
+}
+
+// PERSONNEL HANDLERS
+function handleHireTech() {
+  const hired = playerStore.hireTechnicians(techHiringInput.value)
+  if (hired > 0) {
+    $q.notify({ color: 'positive', message: `Hired ${hired} technicians.` })
+    techHiringInput.value = 0
+  } else {
+    $q.notify({ color: 'negative', message: 'No talent available in HQ region.' })
+  }
+}
+function handleLayoffTech() {
+  const fired = playerStore.layoffTechnicians(techHiringInput.value)
+  if (fired > 0) {
+    $q.notify({ color: 'warning', message: `Laid off ${fired} technicians.` })
+    techHiringInput.value = 0
+  } else {
+    $q.notify({ color: 'negative', message: 'Only idle technicians can be laid off!' })
+  }
+}
+function handleHireWorkers(factory) {
+  const input = factoryHiringInputs.value[factory.id] || 0
+  const hired = playerStore.hireWorkers(factory.id, input)
+  if (hired > 0) {
+    $q.notify({ color: 'positive', message: `Hired ${hired} workers for ${factory.location}.` })
+    factoryHiringInputs.value[factory.id] = 0
+  } else {
+    $q.notify({ color: 'negative', message: 'No regional talent available.' })
+  }
+}
+function handleLayoffWorkers(factory) {
+  const input = factoryHiringInputs.value[factory.id] || 0
+  const fired = playerStore.layoffWorkers(factory.id, input)
+  if (fired > 0) {
+    $q.notify({ color: 'warning', message: `Laid off ${fired} workers from ${factory.location}.` })
+    factoryHiringInputs.value[factory.id] = 0
+  } else {
+    $q.notify({ color: 'negative', message: 'Only idle workers can be laid off!' })
+  }
 }
 
 async function resetGame() {

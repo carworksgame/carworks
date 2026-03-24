@@ -335,6 +335,7 @@ import { useSavesStore } from '../stores/saves'
 import { useBankStore } from '../stores/bank'
 import { useSettingsStore } from '../stores/settings'
 import { useDebugStore } from '../stores/debug'
+import { useReportsStore } from '../stores/reports'
 import { processEndTurn } from '../logic/simulation'
 import { useRouter, useRoute } from 'vue-router'
 
@@ -350,6 +351,7 @@ const savesStore = useSavesStore()
 const bankStore = useBankStore()
 const settingsStore = useSettingsStore()
 const debugStore = useDebugStore()
+const reportsStore = useReportsStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -401,7 +403,19 @@ function returnToLobby() {
 
 async function onLogout() {
   await authStore.logout()
-  gameStore.setSlot(null)
+  
+  // Reset all game stores to clear persisted data
+  gameStore.$reset()
+  playerStore.$reset()
+  worldStore.$reset()
+  researchStore.$reset()
+  designStore.$reset()
+  marketingStore.$reset()
+  competitorStore.$reset()
+  bankStore.$reset()
+  reportsStore.clearReports()
+  debugStore.setSnapshot(null)
+  
   router.push('/login')
 }
 

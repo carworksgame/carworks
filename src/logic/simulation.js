@@ -67,12 +67,28 @@ export function processEndTurn() {
 
   console.log('--- Processing End of Turn ---')
   
+  // 0. Update Talent Pools (Based on satisfaction)
+  worldStore.territories.forEach(territory => {
+    // Basic growth: population based
+    let growth = Math.floor(territory.population / 1000000) * 5
+    
+    // Satisfaction impact (Player is the main driver of satisfaction news in a region)
+    // Find if player has a factory here
+    const factory = playerStore.factories.find(f => f.territory === territory.id)
+    if (factory) {
+      const satisfaction = playerStore.getFactorySatisfaction(factory.id)
+      growth = Math.floor(growth * (satisfaction / 1.0))
+    }
+    
+    territory.talentPool = Math.min(5000, territory.talentPool + growth)
+  })
+
   researchStore.updateAvailableTech(gameStore.year)
   competitorStore.processAITurns(gameStore.year, researchStore.availableTech)
 
   const techProd = playerStore.getTechnicianProductivity
   const originalProgressPerTech = researchStore.progressPerTech
-  researchStore.progressPerTech = originalProgressPerTech * techProd
+  researchStore.progressPerTech = Math.round(originalProgressPerTech * techProd)
   const completedTechs = researchStore.progressResearch()
   if (completedTechs && completedTechs.length > 0) {
     if (!gameStore.lastNewsEvent) {
@@ -96,16 +112,16 @@ export function processEndTurn() {
       strikeBonus = 0 
       gameStore.setNews({ title: `STRIKE in ${f.location}!`, description: 'Workers are striking for better pay.', type: 'crisis' })
     }
-    const capacity = f.employees * playerStore.getFactoryProductivity(f.id) * strikeBonus
-    factoryAggregator[f.id] = { owner: 'player', capacity, territory: f.territory, level: f.level, requests: [] }
-    turnSnapshot.production[f.id] = { owner: 'Player', location: f.location, capacity, totalRequested: 0, actualOutput: 0 }
+    const productivity = playerStore.getFactoryProductivity(f.id) * strikeBonus
+    factoryAggregator[f.id] = { owner: 'player', productivity, territory: f.territory, level: f.level, requests: [] }
+    turnSnapshot.production[f.id] = { owner: 'Player', location: f.location, capacity: f.totalWorkers * productivity, totalRequested: 0, actualOutput: 0 }
   })
 
   competitorStore.competitors.forEach(comp => {
     comp.factories.forEach(f => {
-      const capacity = f.employees * f.productivity
-      factoryAggregator[f.id] = { owner: comp.id, capacity, territory: f.territory, level: f.level, requests: [] }
-      turnSnapshot.production[f.id] = { owner: comp.name, location: f.location, capacity, totalRequested: 0, actualOutput: 0 }
+      const productivity = f.productivity
+      factoryAggregator[f.id] = { owner: comp.id, productivity, territory: f.territory, level: f.level, requests: [] }
+      turnSnapshot.production[f.id] = { owner: comp.name, location: f.location, capacity: f.employees * productivity, totalRequested: 0, actualOutput: 0 }
       aiFinanceMap[comp.id].salaries += f.employees * (f.salary || 50)
       aiFinanceMap[comp.id].maintenance += 500
     })
@@ -113,43 +129,46 @@ export function processEndTurn() {
     aiFinanceMap[comp.id].lease += activeTerritories.length * 200
   })
 
+  // Player Production Requests (Assigned Workers)
   activeModels.forEach(model => {
     worldStore.territories.forEach(salesTerritory => {
-      const config = playerStore.productionConfig[model.id]?.[salesTerritory.id] || { productionVolume: 0 }
-      if (config.productionVolume > 0) {
+      const config = playerStore.productionConfig[model.id]?.[salesTerritory.id] || { assignedWorkers: 0 }
+      if (config.assignedWorkers > 0) {
         const factoryId = playerStore.supplyLines[salesTerritory.id]
         if (factoryId && factoryAggregator[factoryId]) {
-          factoryAggregator[factoryId].requests.push({ model, salesTerritoryId: salesTerritory.id, volume: config.productionVolume })
-          turnSnapshot.production[factoryId].totalRequested += config.productionVolume
+          factoryAggregator[factoryId].requests.push({ model, salesTerritoryId: salesTerritory.id, workers: config.assignedWorkers })
+          turnSnapshot.production[factoryId].totalRequested += Math.floor(config.assignedWorkers * factoryAggregator[factoryId].productivity)
         }
       }
     })
   })
 
+  // AI Requests
   const activeTerritoryIds = worldStore.territories.filter(t => t.active).map(t => t.id)
   competitorStore.competitors.forEach(comp => {
     const compModel = comp.models[0]
     comp.factories.forEach(f => {
-      const volumePerTerritory = Math.floor(factoryAggregator[f.id].capacity / (activeTerritoryIds.length || 1))
+      const workersPerTerritory = Math.floor(f.employees / (activeTerritoryIds.length || 1))
       activeTerritoryIds.forEach(tId => {
-        factoryAggregator[f.id].requests.push({ owner: comp.id, model: compModel, salesTerritoryId: tId, volume: volumePerTerritory })
-        turnSnapshot.production[f.id].totalRequested += volumePerTerritory
+        factoryAggregator[f.id].requests.push({ owner: comp.id, model: compModel, salesTerritoryId: tId, workers: workersPerTerritory })
+        turnSnapshot.production[f.id].totalRequested += Math.floor(workersPerTerritory * factoryAggregator[f.id].productivity)
       })
     })
   })
 
+  // Process Production
   Object.keys(factoryAggregator).forEach(fId => {
     const factory = factoryAggregator[fId]
-    const totalRequestedVolume = factory.requests.reduce((acc, r) => acc + r.volume, 0)
-    const ratio = totalRequestedVolume > factory.capacity ? (factory.capacity / (totalRequestedVolume || 1)) : 1.0
     factory.requests.forEach(req => {
-      const actualProduction = Math.floor(req.volume * ratio)
+      const actualProduction = Math.floor(req.workers * factory.productivity)
       if (actualProduction > 0) {
         const unitCostDiscount = 1 - ((factory.level - 1) * 0.05)
         const finalUnitCost = Math.round(req.model.cost * worldStore.inflationMultiplier * unitCostDiscount)
         const shipRate = worldStore.getShippingCost(factory.territory, req.salesTerritoryId)
         const shipCost = actualProduction * shipRate
+
         companyStats[factory.owner].production += actualProduction
+
         if (factory.owner === 'player') {
           totalProductionCosts += finalUnitCost * actualProduction
           totalShippingCosts += shipCost
@@ -168,7 +187,7 @@ export function processEndTurn() {
     })
   })
 
-  // 4. Sales
+  // 4. Sales Simulation
   let totalSalesIncome = 0
   const shares = { player: 0 }
   const segments = getMarketSegments(gameStore.year)
@@ -224,7 +243,6 @@ export function processEndTurn() {
         if (targetSegment === VEHICLE_CLASSES.SPORT) maxPriceFactor = 3.5
         if (targetSegment === VEHICLE_CLASSES.UTILITY) maxPriceFactor = 1.8
         const affordabilityCap = baseMarketPrice * maxPriceFactor
-        
         let stickerShock = 1.0
         if (m.price > affordabilityCap) {
           const overageRatio = m.price / (affordabilityCap || 1)
@@ -232,7 +250,6 @@ export function processEndTurn() {
           if (isNaN(stickerShock)) stickerShock = 0.0001
           classMultiplier *= stickerShock
         }
-
         const economy = m.stats.realEconomy !== undefined ? m.stats.realEconomy : m.stats.economy
         const safety = m.stats.realSafety !== undefined ? m.stats.realSafety : m.stats.safety
         let perfWeight = 1.0, econWeight = 1.0, safetyWeight = 1.0, priceWeight = 1.0
@@ -240,14 +257,12 @@ export function processEndTurn() {
         else if (targetSegment === VEHICLE_CLASSES.LUXURY) { priceWeight = 0.3; safetyWeight = 3.5; perfWeight = 1.5 }
         else if (targetSegment === VEHICLE_CLASSES.SPORT) { perfWeight = 4.0; priceWeight = 1.2; econWeight = 0.2 }
         else if (targetSegment === VEHICLE_CLASSES.UTILITY) { perfWeight = 1.0; econWeight = 1.0; safetyWeight = 2.0 }
-        
         const perfScore = (m.stats.pwrRatio * perfWeight)
         const econScore = (economy * econWeight)
         const safetyScore = (safety / 5 * safetyWeight)
         const baseScore = (perfScore + econScore + safetyScore) * classMultiplier
         const priceFactor = (m.price / (baseMarketPrice / 2)) * priceWeight
         const value = (baseScore / (priceFactor || 1)) || 0.00001 
-        
         m.debugData = { affordabilityCap, stickerShock, priceFactor }
         return isNaN(value) ? 0.00001 : value
       }
@@ -255,7 +270,7 @@ export function processEndTurn() {
       availableModels.forEach(m => { 
         m.desirability = calculateDesirability(m, segmentClass) 
         lastTurnData.modelComparison[territory.name][segmentClass].push({
-          owner: m.ownerId === 'player' ? 'Player' : 'Rival', model: m.name, price: m.price, desirability: m.desirability
+          owner: companyStats[m.ownerId]?.name || m.ownerId, model: m.name, price: m.price, desirability: m.desirability
         })
       })
 
@@ -296,7 +311,7 @@ export function processEndTurn() {
           competitorStore.removeFromInventory(m.ownerId, m.modelId, territory.id, actualSales)
         }
         turnSnapshot.sales[territory.id].segments[segmentClass].models.push({
-          name: m.name, owner: m.ownerId === 'player' ? 'Player' : 'Rival', desirability: m.desirability, share: shareOfPool,
+          name: m.name, owner: companyStats[m.ownerId]?.name || m.ownerId, desirability: m.desirability, share: shareOfPool,
           potential: Math.floor(salesPotential), actual: actualSales, price: m.price, inventory: m.inventory, pricing: m.debugData
         })
       })
@@ -321,53 +336,35 @@ export function processEndTurn() {
   if (shares.player > 0) playerStore.changeReputation(0.1)
   playerStore.addReputationHistory(gameStore.dateString)
 
-  // 4.5 Process Automotive Expos
   const currentExpo = worldStore.upcomingExpos.find(e => e.year === gameStore.year && e.month === gameStore.month)
   if (currentExpo) {
-    console.log(`[SIM] Processing Expo: ${currentExpo.name}`)
-    let resultTitle = 'Expo results are in!'
-    let resultDesc = `The ${currentExpo.name} has concluded.`
-    let win = false
-
+    let resultTitle = 'Expo results are in!', resultDesc = `The ${currentExpo.name} has concluded.`, win = false
     if (worldStore.participatingModelId) {
       const model = activeModels.find(m => m.id === worldStore.participatingModelId)
       if (model) {
-        // Calculate expo score based on desirability in the expo's territory
         const expoScore = (model.stats.realSafety || 50) + (model.stats.pwrRatio * 5) + playerStore.reputation
         const winThreshold = 150 + (Math.random() * 100)
-        
         if (expoScore > winThreshold) {
-          win = true
-          playerStore.changeReputation(10)
+          win = true; playerStore.changeReputation(10)
           marketingStore.regionalAwareness[currentExpo.territoryId] = Math.min(100, (marketingStore.regionalAwareness[currentExpo.territoryId] || 0) + 25)
-          resultTitle = `VICTORY AT ${currentExpo.name.toUpperCase()}!`
-          resultDesc = `Your ${model.name} was the star of the show! Global reputation and regional brand awareness have surged.`
-        } else {
-          resultDesc = `Your ${model.name} received modest praise, but did not win Best in Show.`
-        }
+          resultTitle = `VICTORY AT ${currentExpo.name.toUpperCase()}!`; resultDesc = `Your ${model.name} was the star of the show! Global reputation and regional brand awareness have surged.`
+        } else resultDesc = `Your ${model.name} received modest praise, but did not win Best in Show.`
       }
-    } else {
-      resultDesc = 'You did not participate in the expo. Missed opportunity for prestige!'
-    }
-    
+    } else resultDesc = 'You did not participate in the expo. Missed opportunity for prestige!'
     gameStore.setNews({ title: resultTitle, description: resultDesc, type: win ? 'growth' : 'recovery' })
     worldStore.clearExpos()
   }
 
-  // Schedule next expo if none exist (every 2 years)
   if (worldStore.upcomingExpos.length === 0 && gameStore.turnCount % 24 === 0) {
     const randomTerritory = worldStore.territories[Math.floor(Math.random() * worldStore.territories.length)]
-    const expoYear = gameStore.year + 1
-    const expoMonth = Math.floor(Math.random() * 12)
-    const expoName = `${randomTerritory.name} Auto Show ${expoYear}`
+    const expoYear = gameStore.year + 1, expoMonth = Math.floor(Math.random() * 12), expoName = `${randomTerritory.name} Auto Show ${expoYear}`
     worldStore.scheduleExpo(expoName, randomTerritory.id, expoYear, expoMonth)
   }
 
   competitorStore.processMonthlyFinances(aiFinanceMap)
   playerStore.processMonthlyFinances({
     turn: gameStore.turnCount, date: gameStore.dateString, marketingCost: marketingStore.totalMonthlyMarketingCost,
-    productionCosts: totalProductionCosts, shippingCosts: totalShippingCosts, salesIncome: totalSalesIncome,
-    recallCosts: 0 
+    productionCosts: totalProductionCosts, shippingCosts: totalShippingCosts, salesIncome: totalSalesIncome, recallCosts: 0 
   })
 
   companyStats.player.profit = playerStore.lastMonthPerformance.net
@@ -381,6 +378,10 @@ export function processEndTurn() {
 
   gameStore.nextTurn()
   playerStore.clearReports()
+  
+  // FINAL STEP: Recalculate idle workers after turn adjustments
+  playerStore.recalculateIdleWorkers()
+  
   debugStore.setSnapshot(turnSnapshot)
   if (gameStore.currentSlotId) savesStore.saveGame(gameStore.currentSlotId, playerStore.companyName)
 

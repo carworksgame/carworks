@@ -7,7 +7,7 @@
       <q-card-section class="bg-orange-9 text-white row items-center">
         <div class="text-h6">Production Control Center</div>
         <q-space />
-        <div class="text-subtitle2">Select a model to manage manufacturing and pricing</div>
+        <div class="text-subtitle2">Select a model to assign workforce and set pricing</div>
       </q-card-section>
       
       <q-card-section>
@@ -43,31 +43,39 @@
 
           <q-card-section v-if="territory.active">
             <div class="row q-col-gutter-md">
-              <!-- Production Settings -->
+              <!-- Workforce Assignment -->
               <div class="col-12">
                 <div class="text-subtitle2 text-orange-9 q-mb-sm row justify-between">
-                  <span>Manufacturing</span>
-                  <q-badge :color="getCapacityColor(territory.id)" class="text-weight-bold">
-                    Capacity: {{ getUsedCapacity(territory.id) }} / {{ getCapacity(territory.id) }} Units
+                  <span>Workforce Assignment</span>
+                  <q-badge :color="getWorkforceColor(territory.id)" class="text-weight-bold">
+                    Factory Workforce: {{ getUsedWorkforce(territory.id) }} / {{ getTotalWorkforce(territory.id) }} People
                   </q-badge>
                 </div>
                 <div class="row items-center q-gutter-sm">
                    <div class="col">
                      <q-slider
-                       v-model="productionSettings[territory.id].productionVolume"
+                       v-model="productionSettings[territory.id].assignedWorkers"
                        :min="0"
-                       :max="Math.max(1000, getCapacity(territory.id))"
-                       :step="10"
+                       :max="getTotalWorkforce(territory.id)"
+                       :step="1"
                        label
                        color="orange-9"
                      />
                    </div>
-                   <div class="text-h6" style="width: 80px">{{ productionSettings[territory.id].productionVolume }}</div>
+                   <div class="text-h6 text-center" style="width: 80px">
+                     {{ productionSettings[territory.id].assignedWorkers }}
+                     <div class="text-caption text-grey-7">Workers</div>
+                   </div>
                 </div>
-                <div v-if="getUsedCapacity(territory.id) > getCapacity(territory.id)" class="text-caption text-negative text-weight-bold">
-                  ⚠️ WARNING: Production exceeds manufacturing capacity! Actual production will be scaled down.
+                
+                <div v-if="getUsedWorkforce(territory.id) > getTotalWorkforce(territory.id)" class="text-caption text-negative text-weight-bold">
+                  ⚠️ WARNING: Over-assigned! Workers will be split proportionally.
                 </div>
-                <div class="text-caption text-grey">Monthly units to build. Each unit costs ${{ selectedModel.cost.toLocaleString() }}.</div>
+
+                <div class="bg-blue-grey-1 q-pa-sm rounded-borders q-mt-sm row justify-between items-center">
+                   <span class="text-caption">Est. Monthly Output:</span>
+                   <span class="text-h6 text-indigo-9">{{ calculateEstOutput(territory.id) }} Units</span>
+                </div>
               </div>
 
               <!-- Pricing Settings -->
@@ -123,31 +131,28 @@ const designStore = useDesignStore()
 const selectedModelId = ref(designStore.models.length > 0 ? designStore.models[0].id : null)
 const selectedModel = computed(() => designStore.models.find(m => m.id === selectedModelId.value))
 
-// Local reactive state for production sliders to avoid direct mutation issues
 const productionSettings = reactive({})
 
-// Initialize settings when a model is selected
 watch(selectedModelId, (newId) => {
   if (newId) {
     worldStore.territories.forEach(t => {
       const config = playerStore.getModelConfig(newId, t.id)
       productionSettings[t.id] = {
-        productionVolume: config.productionVolume || 0,
+        assignedWorkers: config.assignedWorkers || 0,
         price: config.price || Math.floor(selectedModel.value.cost * 1.5)
       }
     })
   }
 }, { immediate: true })
 
-// Sync local settings back to the store
 watch(productionSettings, (newSettings) => {
   if (selectedModelId.value) {
     Object.keys(newSettings).forEach(territoryId => {
       playerStore.updateProductionConfig(
         selectedModelId.value, 
         territoryId, 
-        'productionVolume', 
-        newSettings[territoryId].productionVolume
+        'assignedWorkers', 
+        newSettings[territoryId].assignedWorkers
       )
       playerStore.updateProductionConfig(
         selectedModelId.value, 
@@ -156,13 +161,14 @@ watch(productionSettings, (newSettings) => {
         newSettings[territoryId].price
       )
     })
+    playerStore.recalculateIdleWorkers()
   }
 }, { deep: true })
 
 function marginPercent(territoryId) {
   if (!selectedModel.value || !productionSettings[territoryId]?.price) return 0
   const profit = productionSettings[territoryId].price - selectedModel.value.cost
-  return Math.floor((profit / productionSettings[territoryId].price) * 100)
+  return Math.floor((profit / (productionSettings[territoryId].price || 1)) * 100)
 }
 
 function marginColor(territoryId) {
@@ -172,37 +178,46 @@ function marginColor(territoryId) {
   return 'positive'
 }
 
-function getCapacity(territoryId) {
-  // Region capacity is the sum of output from ALL factories supplying this territory
-  // Wait, actually in the new Logistics system, a territory is supplied by ONE factory.
+function getTotalWorkforce(territoryId) {
   const factoryId = playerStore.supplyLines[territoryId]
   const factory = playerStore.factories.find(f => f.id === factoryId)
-  if (!factory) return 0
-  
-  return Math.floor(factory.employees * playerStore.getFactoryProductivity(factory.id))
+  return factory ? factory.totalWorkers : 0
 }
 
-function getUsedCapacity(territoryId) {
-  // Sum of production volume for all models in this territory
-  // We use productionSettings for the current model and getModelConfig for others
+function getUsedWorkforce(territoryId) {
+  const factoryId = playerStore.supplyLines[territoryId]
   let total = 0
+  
+  // Find all territories supplied by THIS factory
+  const suppliedBySameFactory = Object.keys(playerStore.supplyLines).filter(tId => playerStore.supplyLines[tId] === factoryId)
+
   designStore.models.forEach(model => {
-    if (model.id === selectedModelId.value) {
-      total += productionSettings[territoryId]?.productionVolume || 0
-    } else {
-      const config = playerStore.getModelConfig(model.id, territoryId)
-      total += config.productionVolume || 0
-    }
+    suppliedBySameFactory.forEach(tId => {
+      if (model.id === selectedModelId.value && tId === territoryId) {
+        total += productionSettings[tId]?.assignedWorkers || 0
+      } else {
+        const config = playerStore.getModelConfig(model.id, tId)
+        total += config.assignedWorkers || 0
+      }
+    })
   })
   return total
 }
 
-function getCapacityColor(territoryId) {
-  const used = getUsedCapacity(territoryId)
-  const total = getCapacity(territoryId)
+function getWorkforceColor(territoryId) {
+  const used = getUsedWorkforce(territoryId)
+  const total = getTotalWorkforce(territoryId)
   if (used > total) return 'negative'
   if (used > total * 0.9) return 'warning'
   return 'blue-grey-8'
+}
+
+function calculateEstOutput(territoryId) {
+  const factoryId = playerStore.supplyLines[territoryId]
+  const factory = playerStore.factories.find(f => f.id === factoryId)
+  if (!factory) return 0
+  const workers = productionSettings[territoryId]?.assignedWorkers || 0
+  return Math.floor(workers * playerStore.getFactoryProductivity(factory.id))
 }
 
 function getSupplyingFactoryName(territoryId) {

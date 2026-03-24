@@ -7,10 +7,10 @@ export const useWorldStore = defineStore('world', {
     activeEvents: [],
     inflationMultiplier: 1.0, 
     territories: [
-      { id: 'north-america', name: 'North America', population: 92000000, wealth: 1.2, active: true, baseWage: 50 },
-      { id: 'europe', name: 'Europe', population: 400000000, wealth: 1.0, active: false, unlockCost: 50000, baseWage: 45 },
-      { id: 'south-america', name: 'South America', population: 40000000, wealth: 0.5, active: false, unlockCost: 30000, baseWage: 20 },
-      { id: 'asia', name: 'Asia', population: 900000000, wealth: 0.3, active: false, unlockCost: 75000, baseWage: 15 },
+      { id: 'north-america', name: 'North America', population: 92000000, wealth: 1.2, active: true, baseWage: 50, talentPool: 500 },
+      { id: 'europe', name: 'Europe', population: 400000000, wealth: 1.0, active: false, unlockCost: 50000, baseWage: 45, talentPool: 500 },
+      { id: 'south-america', name: 'South America', population: 40000000, wealth: 0.5, active: false, unlockCost: 30000, baseWage: 20, talentPool: 500 },
+      { id: 'asia', name: 'Asia', population: 900000000, wealth: 0.3, active: false, unlockCost: 75000, baseWage: 15, talentPool: 500 },
     ],
     // Shipping cost per unit between regions
     shippingRates: {

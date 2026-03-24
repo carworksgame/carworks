@@ -5,34 +5,39 @@ export const usePlayerStore = defineStore('player', {
   state: () => ({
     companyName: 'My Car Company',
     funds: 50000,
-    reputation: 50, // 0-100 scale, starts neutral
-    reputationHistory: [], // Rolling 6 months
+    reputation: 50, 
+    reputationHistory: [], 
     
     // Detailed model management
-    productionConfig: {}, // { modelId: { territoryId: { price: 2000, productionVolume: 50 } } }
+    // productionConfig: { modelId: { territoryId: { price: 2000, assignedWorkers: 50 } } }
+    productionConfig: {}, 
     inventory: {}, // { modelId: { territoryId: 100 } }
     
-    // Logistics: Maps territoryId to factoryId
     supplyLines: {
       'north-america': 1
     },
 
     factories: [
-      { id: 1, territory: 'north-america', size: 1, level: 1, employees: 100, salary: 50, maxEmployees: 500, location: 'Detroit' }
+      { 
+        id: 1, territory: 'north-america', size: 1, level: 1, 
+        totalWorkers: 100, idleWorkers: 0, 
+        salary: 50, maxEmployees: 500, location: 'Detroit' 
+      }
     ],
     showrooms: [
       { id: 1, territory: 'north-america', salesForce: 10, monthlyLease: 500 }
     ],
 
     // R&D Personnel
-    technicians: 0,
+    totalTechnicians: 0,
+    idleTechnicians: 0,
     salaryPerTechnician: 60,
 
     // Benefits (Global for company)
-    benefitsLevel: 10, // 0-100 scale
+    benefitsLevel: 10, 
 
     // Market Research
-    purchasedReports: {}, // { territoryId: { date, segments, totalPotential } }
+    purchasedReports: {}, 
 
     ledger: []
   }),
@@ -40,11 +45,14 @@ export const usePlayerStore = defineStore('player', {
   persist: true,
 
   getters: {
-    totalEmployees: (state) => state.factories.reduce((acc, f) => acc + f.employees, 0),
+    totalEmployees: (state) => {
+      const factoryWorkers = state.factories.reduce((acc, f) => acc + f.totalWorkers, 0)
+      return factoryWorkers + state.totalTechnicians
+    },
     
     monthlySalaryBill: (state) => {
-      const factorySalaries = state.factories.reduce((acc, f) => acc + (f.employees * f.salary), 0)
-      const technicianSalaries = state.technicians * state.salaryPerTechnician
+      const factorySalaries = state.factories.reduce((acc, f) => acc + (f.totalWorkers * f.salary), 0)
+      const technicianSalaries = state.totalTechnicians * state.salaryPerTechnician
       const basePayroll = factorySalaries + technicianSalaries
       const benefitsCost = basePayroll * (state.benefitsLevel / 100) * 0.2
       return basePayroll + benefitsCost
@@ -59,7 +67,7 @@ export const usePlayerStore = defineStore('player', {
       if (!factory) return 0
       const territory = worldStore.territories.find(t => t.id === factory.territory)
       const baseWage = territory?.baseWage || 50
-      const ratio = factory.salary / baseWage
+      const ratio = factory.salary / (baseWage || 1)
       const benefitBonus = (state.benefitsLevel / 100) * 0.2
       return ratio + benefitBonus
     },
@@ -76,7 +84,7 @@ export const usePlayerStore = defineStore('player', {
     getTechnicianSatisfaction: (state) => {
       const worldStore = useWorldStore()
       const baseWage = worldStore.territories.find(t => t.id === 'north-america')?.baseWage || 50
-      const ratio = state.salaryPerTechnician / baseWage
+      const ratio = state.salaryPerTechnician / (baseWage || 1)
       const benefitBonus = (state.benefitsLevel / 100) * 0.2
       return ratio + benefitBonus
     },
@@ -87,7 +95,7 @@ export const usePlayerStore = defineStore('player', {
     },
 
     getModelConfig: (state) => (modelId, territoryId) => {
-      return state.productionConfig[modelId]?.[territoryId] || { price: 0, productionVolume: 0 }
+      return state.productionConfig[modelId]?.[territoryId] || { price: 0, assignedWorkers: 0 }
     },
     getInventory: (state) => (modelId, territoryId) => {
       return state.inventory[modelId]?.[territoryId] || 0
@@ -112,7 +120,7 @@ export const usePlayerStore = defineStore('player', {
     updateProductionConfig(modelId, territoryId, key, value) {
       if (!this.productionConfig[modelId]) this.productionConfig[modelId] = {}
       if (!this.productionConfig[modelId][territoryId]) {
-        this.productionConfig[modelId][territoryId] = { price: 1000, productionVolume: 0 }
+        this.productionConfig[modelId][territoryId] = { price: 1000, assignedWorkers: 0 }
       }
       this.productionConfig[modelId][territoryId][key] = value
     },
@@ -182,7 +190,8 @@ export const usePlayerStore = defineStore('player', {
           territory: territoryId,
           size: 1,
           level: 1,
-          employees: 50,
+          totalWorkers: 50,
+          idleWorkers: 50,
           salary: 50, 
           maxEmployees: 500,
           location: locationName
@@ -192,8 +201,49 @@ export const usePlayerStore = defineStore('player', {
       return false
     },
 
-    hireTechnicians(count) { this.technicians += count },
-    fireTechnicians(count) { this.technicians = Math.max(0, this.technicians - count) },
+    hireWorkers(factoryId, count) {
+      const worldStore = useWorldStore()
+      const factory = this.factories.find(f => f.id === factoryId)
+      if (!factory) return false
+      
+      const territory = worldStore.territories.find(t => t.id === factory.territory)
+      const actualHires = Math.min(count, territory.talentPool)
+      
+      factory.totalWorkers += actualHires
+      factory.idleWorkers += actualHires
+      territory.talentPool -= actualHires
+      return actualHires
+    },
+
+    layoffWorkers(factoryId, count) {
+      const factory = this.factories.find(f => f.id === factoryId)
+      if (!factory) return false
+      
+      const actualLayoffs = Math.min(count, factory.idleWorkers)
+      factory.totalWorkers -= actualLayoffs
+      factory.idleWorkers -= actualLayoffs
+      // Laid off workers don't necessarily return to talent pool immediately in Detroit
+      return actualLayoffs
+    },
+
+    hireTechnicians(count) {
+      const worldStore = useWorldStore()
+      const hqTerritory = worldStore.territories.find(t => t.id === 'north-america')
+      const actualHires = Math.min(count, hqTerritory.talentPool)
+      
+      this.totalTechnicians += actualHires
+      this.idleTechnicians += actualHires
+      hqTerritory.talentPool -= actualHires
+      return actualHires
+    },
+
+    layoffTechnicians(count) {
+      const actualLayoffs = Math.min(count, this.idleTechnicians)
+      this.totalTechnicians -= actualLayoffs
+      this.idleTechnicians -= actualLayoffs
+      return actualLayoffs
+    },
+
     updateBenefits(level) { this.benefitsLevel = Math.min(100, Math.max(0, level)) },
 
     upgradeFactory(factoryId) {
@@ -224,6 +274,28 @@ export const usePlayerStore = defineStore('player', {
 
     clearReports() {
       this.purchasedReports = {}
+    },
+
+    recalculateIdleWorkers() {
+      this.factories.forEach(f => {
+        // Calculate assigned workers for this factory's supplied territories
+        let assigned = 0
+        const factorySuppliedTerritories = Object.keys(this.supplyLines).filter(tId => this.supplyLines[tId] === f.id)
+        
+        Object.keys(this.productionConfig).forEach(modelId => {
+          factorySuppliedTerritories.forEach(tId => {
+            assigned += (this.productionConfig[modelId]?.[tId]?.assignedWorkers || 0)
+          })
+        })
+        
+        f.idleWorkers = Math.max(0, f.totalWorkers - assigned)
+      })
+
+      // Technicians
+      const researchStore = import('./research').then(m => {
+          const store = m.useResearchStore()
+          this.idleTechnicians = Math.max(0, this.totalTechnicians - store.totalAssignedTechnicians)
+      })
     }
   }
 })

@@ -5,7 +5,7 @@
         <q-card square bordered class="q-pa-lg shadow-2 login-card">
           <q-card-section class="text-center">
             <div class="text-h4 text-weight-bolder text-brown-9 q-mb-md">CarWorks</div>
-            <q-icon name="directions_car" size="100px" color="brown-6" />
+            <img src="~assets/images/logo.png" class="login-logo" />
             <div class="text-subtitle1 text-grey-8 q-mt-md">Sign in to manage your automotive empire</div>
           </q-card-section>
 
@@ -126,5 +126,10 @@ function handleAuthResult(result) {
 .login-card {
   width: 400px;
   max-width: 90vw;
+}
+.login-logo {
+  max-width: 150px;
+  height: auto;
+  margin: 0 auto;
 }
 </style>
