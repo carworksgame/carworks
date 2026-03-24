@@ -136,6 +136,13 @@
       <router-view />
     </q-page-container>
 
+    <!-- Floating Back to Factory Button -->
+    <q-page-sticky v-if="route.path !== '/'" position="bottom-right" :offset="[18, 18]" style="z-index: 2000">
+      <q-btn fab icon="factory" color="brown-9" @click="router.push('/')">
+        <q-tooltip anchor="center left" self="center right">Return to Factory Hub</q-tooltip>
+      </q-btn>
+    </q-page-sticky>
+
     <!-- Global Settings Dialog -->
     <q-dialog v-model="showSettingsDialog">
       <q-card style="min-width: 350px">
