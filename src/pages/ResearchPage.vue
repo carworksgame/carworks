@@ -4,7 +4,7 @@
       <div class="text-h4">R&D Laboratory</div>
       <q-space />
       <div class="text-subtitle1">
-        Technicians: <span class="text-weight-bold text-blue-9">{{ playerStore.technicians }}</span>
+        Technicians: <span class="text-weight-bold text-blue-9">{{ playerStore.totalTechnicians }}</span>
       </div>
     </div>
 
@@ -60,8 +60,8 @@
         <q-card-section>
           <div class="row justify-between items-center q-mb-sm">
             <div class="text-subtitle2 text-uppercase text-grey-7">Personnel Distribution</div>
-            <q-badge :color="idleTechnicians > 0 ? 'orange' : 'grey-7'">
-              {{ idleTechnicians }} Technicians Idle
+            <q-badge :color="playerStore.idleTechnicians > 0 ? 'orange' : 'grey-7'">
+              {{ playerStore.idleTechnicians }} Technicians Idle
             </q-badge>
           </div>
           
@@ -74,8 +74,8 @@
                 </div>
                 <div class="row items-center q-gutter-x-sm">
                   <q-btn flat dense icon="remove" color="red" @click="updateTrack(track, -1)" :disabled="researchStore.trackAssignments[track] <= 0" />
-                  <q-linear-progress :value="researchStore.trackAssignments[track] / (playerStore.technicians || 1)" color="blue-7" class="col" />
-                  <q-btn flat dense icon="add" color="green" @click="updateTrack(track, 1)" :disabled="idleTechnicians <= 0" />
+                  <q-linear-progress :value="researchStore.trackAssignments[track] / (playerStore.totalTechnicians || 1)" color="blue-7" class="col" />
+                  <q-btn flat dense icon="add" color="green" @click="updateTrack(track, 1)" :disabled="playerStore.idleTechnicians <= 0" />
                 </div>
               </div>
             </div>
@@ -114,7 +114,7 @@
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <div class="text-subtitle2 text-grey-8">Cost: ${{ tech.cost.toLocaleString() }}</div>
+          <div class="text-subtitle2 text-grey-8">Cost: {{ tech.cost.toLocaleString() }} pts</div>
         </q-card-section>
 
         <q-separator />
@@ -147,10 +147,6 @@ const playerStore = usePlayerStore()
 
 const tracks = ['Engine', 'Handling', 'Safety', 'Aesthetic']
 
-const idleTechnicians = computed(() => {
-  return playerStore.technicians - researchStore.totalAssignedTechnicians
-})
-
 function getProjectPower(project) {
   const assigned = researchStore.trackAssignments[project.category] || 0
   return assigned * researchStore.progressPerTech
@@ -170,6 +166,7 @@ function isCategoryBusy(cat) {
 function updateTrack(track, delta) {
   const current = researchStore.trackAssignments[track] || 0
   researchStore.updateAssignment(track, current + delta)
+  playerStore.recalculateIdleWorkers()
 }
 
 function formatTechName(id) {
