@@ -13,6 +13,7 @@
       <q-tab name="reports" label="Reports" icon="bar_chart" />
       <q-tab name="personnel" label="Personnel" icon="groups" />
       <q-tab name="risk" label="Risk Management" icon="gavel" />
+      <q-tab name="corporate" label="Corporate Actions" icon="handshake" />
       <q-tab name="research" label="Market Research" icon="analytics" />
       <q-tab name="logistics" label="Logistics" icon="local_shipping" />
       <q-tab name="expansion" label="Global Expansion" icon="public" />
@@ -285,6 +286,55 @@
                   </q-item-section>
                 </q-item>
               </q-list>
+            </q-card-section>
+          </q-card>
+        </div>
+      </q-tab-panel>
+
+      <!-- CORPORATE ACTIONS PANEL -->
+      <q-tab-panel name="corporate" class="q-pa-none">
+        <div class="row q-gutter-md">
+          <q-card v-for="comp in competitorStore.competitors" :key="comp.id" flat bordered class="col-12 col-md-4">
+            <q-card-section :class="comp.status === 'distressed' ? 'bg-red-9' : 'bg-indigo-10'" class="text-white row items-center">
+              <div class="text-h6">{{ comp.name }}</div>
+              <q-space />
+              <q-badge v-if="comp.status === 'distressed'" color="white" text-color="red-9" label="DISTRESSED" class="text-bold" />
+              <q-icon v-else name="business" size="sm" />
+            </q-card-section>
+
+            <q-card-section class="q-pa-md">
+              <div class="row justify-between q-mb-sm">
+                <span>Headquarters:</span>
+                <span class="text-weight-bold text-uppercase">{{ comp.homeTerritory }}</span>
+              </div>
+              <div class="row justify-between q-mb-sm">
+                <span>Strategic Focus:</span>
+                <q-badge color="grey-3" text-color="grey-9">{{ comp.personality.segment }}</q-badge>
+              </div>
+              <q-separator class="q-my-sm" />
+              <div class="row justify-between q-mb-xs">
+                <span class="text-grey-7">Cash Reserves:</span>
+                <span :class="comp.funds < 0 ? 'text-red-9' : 'text-green-9'" class="text-weight-bold">
+                  ${{ comp.funds.toLocaleString() }}
+                </span>
+              </div>
+              <div class="row justify-between q-mb-xs">
+                <span class="text-grey-7">Public Reputation:</span>
+                <span class="text-weight-bold">{{ Math.floor(comp.reputation) }} / 100</span>
+              </div>
+            </q-card-section>
+
+            <q-card-actions v-if="comp.status === 'distressed'" class="bg-red-1">
+              <q-btn 
+                color="red-9" 
+                class="full-width" 
+                label="Acquire Assets" 
+                icon="shopping_cart"
+                @click="handleAcquisition(comp)"
+              />
+            </q-card-actions>
+            <q-card-section v-else class="text-center text-caption text-grey-6 italic">
+              Company is stable. Hostile takeover unavailable.
             </q-card-section>
           </q-card>
         </div>
@@ -916,6 +966,7 @@ import { useDesignStore } from '../stores/design'
 import { useSavesStore } from '../stores/saves'
 import { useDebugStore } from '../stores/debug'
 import { useReportsStore } from '../stores/reports'
+import { useResearchStore } from '../stores/research'
 import { getMarketSegments, getBaseMarketPrice } from '../logic/simulation'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
@@ -930,6 +981,7 @@ const designStore = useDesignStore()
 const savesStore = useSavesStore()
 const debugStore = useDebugStore()
 const reportsStore = useReportsStore()
+const researchStore = useResearchStore()
 const router = useRouter()
 const $q = useQuasar()
 
@@ -941,7 +993,6 @@ const selectedTerritory = ref(null)
 const factoryLocationName = ref('')
 const selectedResearchId = ref(null)
 
-// Personnel Hiring Inputs
 const techHiringInput = ref(0)
 const factoryHiringInputs = ref({})
 
@@ -975,6 +1026,7 @@ const currentReportTitle = computed(() => {
   }
   return titles[selectedReport.value] || 'Report'
 })
+
 function getChartHeight(value, type) {
   if (reportsStore.history.length === 0) return 0
   let max = 0
@@ -985,22 +1037,20 @@ function getChartHeight(value, type) {
   })
   if (max === 0) return 0
   const absValue = Math.abs(value)
-  return Math.max(2, (absValue / max) * 100) // Returns percentage 0-100
+  return Math.max(2, (absValue / max) * 100)
 }
 
 function getChartStyle(value, type, companyId) {
   const heightPercent = getChartHeight(value, type)
   const color = getCompanyColor(companyId)
-  
   const style = {
-    height: (heightPercent / 2) + '%', // Each side gets 50% max
+    height: (heightPercent / 2) + '%',
     width: '20px',
     backgroundColor: color,
     position: 'absolute',
     left: '50%',
     transform: 'translateX(-50%)'
   }
-
   if (value >= 0) {
     style.bottom = '50%'
     style.borderRadius = '2px 2px 0 0'
@@ -1008,16 +1058,20 @@ function getChartStyle(value, type, companyId) {
     style.top = '50%'
     style.borderRadius = '0 0 2px 2px'
   }
-
   return style
 }
 
 function getCompanyColor(companyId) {
   const colors = {
     player: '#4caf50',
-    'ford-rival': '#1976d2',
-    'gm-rival': '#f44336',
-    'euro-rival': '#ff9800'
+    'blue-oval': '#1976d2',
+    'general-auto': '#f44336',
+    'continental': '#ff9800',
+    'bavarian': '#673ab7',
+    'nippon': '#009688',
+    'britannia': '#795548',
+    'detroit-deluxe': '#607d8b',
+    'volks-wagon': '#3f51b5'
   }
   return colors[companyId] || '#9e9e9e'
 }
@@ -1081,7 +1135,7 @@ function modernizeFactory(factory) {
   const cost = playerStore.getUpgradeCost(factory.level)
   $q.dialog({
     title: 'Modernize Factory',
-    message: `Are you sure you want to upgrade the ${factory.location} factory to Level ${factory.level + 1}? Cost: $${cost.toLocaleString()}`,
+    message: `Upgrade to Level ${factory.level + 1}? Cost: $${cost.toLocaleString()}`,
     cancel: true,
     persistent: true
   }).onOk(() => {
@@ -1094,21 +1148,21 @@ function modernizeFactory(factory) {
 function resolveIssue(issue) {
   const result = designStore.resolveIssue(issue.id)
   if (result.success) {
-    $q.notify({ color: 'positive', message: `Recall for ${issue.modelName} issued in ${issue.territoryName}. Cost: $${result.cost.toLocaleString()}`, icon: 'check_circle' })
+    $q.notify({ color: 'positive', message: `Recall issued. Cost: $${result.cost.toLocaleString()}`, icon: 'check_circle' })
   } else {
-    $q.notify({ color: 'negative', message: 'Insufficient funds to issue recall.' })
+    $q.notify({ color: 'negative', message: 'Insufficient funds.' })
   }
 }
 
 function ignoreIssue(issue) {
   $q.dialog({
-    title: 'Ignore Public Demands?',
-    message: 'If you ignore these safety concerns, your company reputation will take a massive hit (-15). Are you sure?',
+    title: 'Ignore Demands?',
+    message: 'Reputation will take a massive hit. Are you sure?',
     cancel: true,
     persistent: true
   }).onOk(() => {
     designStore.ignoreIssue(issue.id)
-    $q.notify({ color: 'negative', message: 'Reputation damaged. The public will remember this.', icon: 'mood_bad' })
+    $q.notify({ color: 'negative', message: 'Reputation damaged.', icon: 'mood_bad' })
   })
 }
 
@@ -1119,7 +1173,7 @@ function buyReport(territoryId) {
   if (playerStore.buyReport(territoryId, segments, totalPotential)) {
     $q.notify({ color: 'positive', message: 'Report commissioned!', icon: 'analytics' })
   } else {
-    $q.notify({ color: 'negative', message: 'Insufficient funds for research.' })
+    $q.notify({ color: 'negative', message: 'Insufficient funds.' })
   }
 }
 
@@ -1135,62 +1189,80 @@ function getMarketInsight(cls) {
 
 const savingsAmount = ref(0)
 function handleDeposit() {
-  if (savingsAmount.value > playerStore.funds) {
-    $q.notify({ color: 'negative', message: 'You do not have enough funds.' })
-    return
-  }
+  if (savingsAmount.value > playerStore.funds) { $q.notify({ color: 'negative', message: 'Insufficient funds.' }); return }
   bankStore.deposit(savingsAmount.value)
   $q.notify({ color: 'positive', message: 'Deposited.' })
   savingsAmount.value = 0
 }
 function handleWithdraw() {
-  if (savingsAmount.value > bankStore.savingsBalance) {
-    $q.notify({ color: 'negative', message: 'You do not have enough savings.' })
-    return
-  }
+  if (savingsAmount.value > bankStore.savingsBalance) { $q.notify({ color: 'negative', message: 'Insufficient savings.' }); return }
   bankStore.withdraw(savingsAmount.value)
   $q.notify({ color: 'positive', message: 'Withdrew.' })
   savingsAmount.value = 0
 }
 
-// PERSONNEL HANDLERS
 function handleHireTech() {
   const hired = playerStore.hireTechnicians(techHiringInput.value)
-  if (hired > 0) {
-    $q.notify({ color: 'positive', message: `Hired ${hired} technicians.` })
-    techHiringInput.value = 0
-  } else {
-    $q.notify({ color: 'negative', message: 'No talent available in HQ region.' })
-  }
+  if (hired > 0) { $q.notify({ color: 'positive', message: `Hired ${hired} technicians.` }); techHiringInput.value = 0 }
+  else $q.notify({ color: 'negative', message: 'No talent available.' })
 }
 function handleLayoffTech() {
   const fired = playerStore.layoffTechnicians(techHiringInput.value)
-  if (fired > 0) {
-    $q.notify({ color: 'warning', message: `Laid off ${fired} technicians.` })
-    techHiringInput.value = 0
-  } else {
-    $q.notify({ color: 'negative', message: 'Only idle technicians can be laid off!' })
-  }
+  if (fired > 0) { $q.notify({ color: 'warning', message: `Laid off ${fired} technicians.` }); techHiringInput.value = 0 }
+  else $q.notify({ color: 'negative', message: 'Only idle technicians can be laid off!' })
 }
 function handleHireWorkers(factory) {
   const input = factoryHiringInputs.value[factory.id] || 0
   const hired = playerStore.hireWorkers(factory.id, input)
-  if (hired > 0) {
-    $q.notify({ color: 'positive', message: `Hired ${hired} workers for ${factory.location}.` })
-    factoryHiringInputs.value[factory.id] = 0
-  } else {
-    $q.notify({ color: 'negative', message: 'No regional talent available.' })
-  }
+  if (hired > 0) { $q.notify({ color: 'positive', message: `Hired ${hired} workers.` }); factoryHiringInputs.value[factory.id] = 0 }
+  else $q.notify({ color: 'negative', message: 'No talent available.' })
 }
 function handleLayoffWorkers(factory) {
   const input = factoryHiringInputs.value[factory.id] || 0
   const fired = playerStore.layoffWorkers(factory.id, input)
-  if (fired > 0) {
-    $q.notify({ color: 'warning', message: `Laid off ${fired} workers from ${factory.location}.` })
-    factoryHiringInputs.value[factory.id] = 0
-  } else {
-    $q.notify({ color: 'negative', message: 'Only idle workers can be laid off!' })
-  }
+  if (fired > 0) { $q.notify({ color: 'warning', message: `Laid off ${fired} workers.` }); factoryHiringInputs.value[factory.id] = 0 }
+  else $q.notify({ color: 'negative', message: 'Only idle workers can be laid off!' })
+}
+
+function handleAcquisition(comp) {
+  const assetValue = comp.factories.length * 15000 + (comp.unlockedTech.length * 2000)
+  const price = Math.round(assetValue * 0.6) // 40% discount for distressed
+  
+  $q.dialog({
+    title: 'Acquire Rival Assets',
+    message: `Are you sure you want to acquire ${comp.name}? This will grant you all their factories and research. Cost: $${price.toLocaleString()}`,
+    cancel: true,
+    persistent: true
+  }).onOk(() => {
+    if (playerStore.funds >= price) {
+      playerStore.funds -= price
+      
+      // 1. Transfer Factories
+      comp.factories.forEach(f => {
+        playerStore.factories.push({
+          ...f,
+          id: Date.now() + Math.random(),
+          totalWorkers: f.employees,
+          idleWorkers: f.employees,
+          location: `${comp.name} - ${f.location}`
+        })
+      })
+      
+      // 2. Transfer Tech
+      comp.unlockedTech.forEach(tId => {
+        if (!researchStore.unlockedTech.includes(tId)) {
+          researchStore.unlockedTech.push(tId)
+        }
+      })
+      
+      // 3. Remove Rival
+      competitorStore.removeCompetitor(comp.id)
+      
+      $q.notify({ color: 'positive', message: `${comp.name} assets absorbed into your empire!`, icon: 'handshake' })
+    } else {
+      $q.notify({ color: 'negative', message: 'Insufficient funds for acquisition.' })
+    }
+  })
 }
 
 async function resetGame() {

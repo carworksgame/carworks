@@ -192,6 +192,9 @@ async function startNewGame() {
   reportsStore.clearReports()
   debugStore.setSnapshot(null)
 
+  // INITIALIZE RANDOM AI RIVALS
+  competitorStore.initializeRivals()
+
   const slotId = 'slot-' + Date.now()
   gameStore.setSlot(slotId)
   playerStore.companyName = newCompanyName.value

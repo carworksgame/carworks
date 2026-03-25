@@ -11,17 +11,11 @@ import { useDebugStore } from '../stores/debug'
 import { useReportsStore } from '../stores/reports'
 
 export function getMarketSegments(year) {
-  if (year < 1925) {
-    return { [VEHICLE_CLASSES.UTILITY]: 0.7, [VEHICLE_CLASSES.ECONOMY]: 0.3 }
-  } else if (year < 1945) {
-    return { [VEHICLE_CLASSES.ECONOMY]: 0.4, [VEHICLE_CLASSES.UTILITY]: 0.3, [VEHICLE_CLASSES.LUXURY]: 0.3 }
-  } else if (year < 1970) {
-    return { [VEHICLE_CLASSES.LUXURY]: 0.4, [VEHICLE_CLASSES.SPORT]: 0.2, [VEHICLE_CLASSES.ECONOMY]: 0.2, [VEHICLE_CLASSES.UTILITY]: 0.2 }
-  } else if (year < 1985) {
-    return { [VEHICLE_CLASSES.ECONOMY]: 0.6, [VEHICLE_CLASSES.LUXURY]: 0.15, [VEHICLE_CLASSES.SPORT]: 0.15, [VEHICLE_CLASSES.UTILITY]: 0.1 }
-  } else {
-    return { [VEHICLE_CLASSES.ECONOMY]: 0.3, [VEHICLE_CLASSES.UTILITY]: 0.3, [VEHICLE_CLASSES.LUXURY]: 0.2, [VEHICLE_CLASSES.SPORT]: 0.2 }
-  }
+  if (year < 1925) return { [VEHICLE_CLASSES.UTILITY]: 0.7, [VEHICLE_CLASSES.ECONOMY]: 0.3 }
+  else if (year < 1945) return { [VEHICLE_CLASSES.ECONOMY]: 0.4, [VEHICLE_CLASSES.UTILITY]: 0.3, [VEHICLE_CLASSES.LUXURY]: 0.3 }
+  else if (year < 1970) return { [VEHICLE_CLASSES.LUXURY]: 0.4, [VEHICLE_CLASSES.SPORT]: 0.2, [VEHICLE_CLASSES.ECONOMY]: 0.2, [VEHICLE_CLASSES.UTILITY]: 0.2 }
+  else if (year < 1985) return { [VEHICLE_CLASSES.ECONOMY]: 0.6, [VEHICLE_CLASSES.LUXURY]: 0.15, [VEHICLE_CLASSES.SPORT]: 0.15, [VEHICLE_CLASSES.UTILITY]: 0.1 }
+  else return { [VEHICLE_CLASSES.ECONOMY]: 0.3, [VEHICLE_CLASSES.UTILITY]: 0.3, [VEHICLE_CLASSES.LUXURY]: 0.2, [VEHICLE_CLASSES.SPORT]: 0.2 }
 }
 
 export function getBaseMarketPrice(year) {
@@ -48,12 +42,8 @@ export function processEndTurn() {
 
   const turnSnapshot = { production: {}, sales: {}, year: gameStore.year }
   const lastTurnData = {
-    turn: gameStore.turnCount,
-    date: gameStore.dateString,
-    incomeByModel: {},
-    incomeByRegion: {},
-    modelReport: {},
-    modelComparison: {}
+    turn: gameStore.turnCount, date: gameStore.dateString,
+    incomeByModel: {}, incomeByRegion: {}, modelReport: {}, modelComparison: {}
   }
   const companyStats = {
     player: { name: playerStore.companyName, production: 0, sales: 0, profit: 0 }
@@ -67,21 +57,25 @@ export function processEndTurn() {
 
   console.log('--- Processing End of Turn ---')
   
-  // 0. Update Talent Pools (Based on satisfaction)
+  // 0. Update Talent Pools & Check for New AI Entries
   worldStore.territories.forEach(territory => {
-    // Basic growth: population based
     let growth = Math.floor(territory.population / 1000000) * 5
-    
-    // Satisfaction impact (Player is the main driver of satisfaction news in a region)
-    // Find if player has a factory here
     const factory = playerStore.factories.find(f => f.territory === territory.id)
     if (factory) {
       const satisfaction = playerStore.getFactorySatisfaction(factory.id)
       growth = Math.floor(growth * (satisfaction / 1.0))
     }
-    
     territory.talentPool = Math.min(5000, territory.talentPool + growth)
   })
+
+  // Emergent Rivals (Every 25 years if slot available)
+  let emergentEvent = null
+  if (gameStore.turnCount > 0 && gameStore.turnCount % 300 === 0 && competitorStore.competitors.length < 4) {
+    const newRival = competitorStore.spawnNewRival(gameStore.year)
+    if (newRival) {
+      emergentEvent = { title: 'NEW COMPETITOR!', description: `${newRival.name} has been founded in ${newRival.homeTerritory.toUpperCase()}!`, type: 'competition' }
+    }
+  }
 
   researchStore.updateAvailableTech(gameStore.year)
   competitorStore.processAITurns(gameStore.year, researchStore.availableTech)
@@ -100,8 +94,7 @@ export function processEndTurn() {
   marketingStore.processMonthlyBrandGrowth()
 
   // 3. Unified Production Simulation
-  let totalProductionCosts = 0
-  let totalShippingCosts = 0
+  let totalProductionCosts = 0, totalShippingCosts = 0
   const activeModels = designStore.models
   const factoryAggregator = {}
   
@@ -129,7 +122,6 @@ export function processEndTurn() {
     aiFinanceMap[comp.id].lease += activeTerritories.length * 200
   })
 
-  // Player Production Requests (Assigned Workers)
   activeModels.forEach(model => {
     worldStore.territories.forEach(salesTerritory => {
       const config = playerStore.productionConfig[model.id]?.[salesTerritory.id] || { assignedWorkers: 0 }
@@ -143,7 +135,6 @@ export function processEndTurn() {
     })
   })
 
-  // AI Requests
   const activeTerritoryIds = worldStore.territories.filter(t => t.active).map(t => t.id)
   competitorStore.competitors.forEach(comp => {
     const compModel = comp.models[0]
@@ -156,7 +147,6 @@ export function processEndTurn() {
     })
   })
 
-  // Process Production
   Object.keys(factoryAggregator).forEach(fId => {
     const factory = factoryAggregator[fId]
     factory.requests.forEach(req => {
@@ -166,9 +156,7 @@ export function processEndTurn() {
         const finalUnitCost = Math.round(req.model.cost * worldStore.inflationMultiplier * unitCostDiscount)
         const shipRate = worldStore.getShippingCost(factory.territory, req.salesTerritoryId)
         const shipCost = actualProduction * shipRate
-
         companyStats[factory.owner].production += actualProduction
-
         if (factory.owner === 'player') {
           totalProductionCosts += finalUnitCost * actualProduction
           totalShippingCosts += shipCost
@@ -246,8 +234,7 @@ export function processEndTurn() {
         let stickerShock = 1.0
         if (m.price > affordabilityCap) {
           const overageRatio = m.price / (affordabilityCap || 1)
-          stickerShock = Math.pow(0.1, overageRatio * 2)
-          if (isNaN(stickerShock)) stickerShock = 0.0001
+          stickerShock = Math.pow(0.1, overageRatio * 2); if (isNaN(stickerShock)) stickerShock = 0.0001
           classMultiplier *= stickerShock
         }
         const economy = m.stats.realEconomy !== undefined ? m.stats.realEconomy : m.stats.economy
@@ -269,7 +256,6 @@ export function processEndTurn() {
 
       availableModels.forEach(m => { 
         m.desirability = calculateDesirability(m, segmentClass) 
-        // Only include in comparison report if it's the intended segment for this car
         if (m.vehicleClass === segmentClass) {
           lastTurnData.modelComparison[territory.name][segmentClass].push({
             owner: companyStats[m.ownerId]?.name || m.ownerId, model: m.name, price: m.price, desirability: m.desirability
@@ -339,29 +325,35 @@ export function processEndTurn() {
   if (shares.player > 0) playerStore.changeReputation(0.1)
   playerStore.addReputationHistory(gameStore.dateString)
 
+  // 4.5 Expos & 4.6 Bankruptcy Alerts
   const currentExpo = worldStore.upcomingExpos.find(e => e.year === gameStore.year && e.month === gameStore.month)
   if (currentExpo) {
-    let resultTitle = 'Expo results are in!', resultDesc = `The ${currentExpo.name} has concluded.`, win = false
+    let resultTitle = 'Expo results are in!', win = false
     if (worldStore.participatingModelId) {
       const model = activeModels.find(m => m.id === worldStore.participatingModelId)
       if (model) {
         const expoScore = (model.stats.realSafety || 50) + (model.stats.pwrRatio * 5) + playerStore.reputation
-        const winThreshold = 150 + (Math.random() * 100)
-        if (expoScore > winThreshold) {
+        if (expoScore > 150 + (Math.random() * 100)) {
           win = true; playerStore.changeReputation(10)
           marketingStore.regionalAwareness[currentExpo.territoryId] = Math.min(100, (marketingStore.regionalAwareness[currentExpo.territoryId] || 0) + 25)
-          resultTitle = `VICTORY AT ${currentExpo.name.toUpperCase()}!`; resultDesc = `Your ${model.name} was the star of the show! Global reputation and regional brand awareness have surged.`
-        } else resultDesc = `Your ${model.name} received modest praise, but did not win Best in Show.`
+          resultTitle = `VICTORY AT ${currentExpo.name.toUpperCase()}!`
+        }
       }
-    } else resultDesc = 'You did not participate in the expo. Missed opportunity for prestige!'
-    gameStore.setNews({ title: resultTitle, description: resultDesc, type: win ? 'growth' : 'recovery' })
+    }
+    gameStore.setNews({ title: resultTitle, description: win ? 'Best in Show!' : 'Expo concluded.', type: win ? 'growth' : 'recovery' })
     worldStore.clearExpos()
   }
 
+  // Check for AI distress
+  competitorStore.competitors.forEach(comp => {
+    if (comp.status === 'distressed' && !gameStore.lastNewsEvent) {
+      gameStore.setNews({ title: 'DISTRESS SALE!', description: `${comp.name} is facing insolvency. Their assets are available for acquisition in the Manager's Office.`, type: 'crisis' })
+    }
+  })
+
   if (worldStore.upcomingExpos.length === 0 && gameStore.turnCount % 24 === 0) {
     const randomTerritory = worldStore.territories[Math.floor(Math.random() * worldStore.territories.length)]
-    const expoYear = gameStore.year + 1, expoMonth = Math.floor(Math.random() * 12), expoName = `${randomTerritory.name} Auto Show ${expoYear}`
-    worldStore.scheduleExpo(expoName, randomTerritory.id, expoYear, expoMonth)
+    worldStore.scheduleExpo(`${randomTerritory.name} Auto Show ${gameStore.year + 1}`, randomTerritory.id, gameStore.year + 1, 5)
   }
 
   competitorStore.processMonthlyFinances(aiFinanceMap)
@@ -376,15 +368,13 @@ export function processEndTurn() {
   reportsStore.setLastTurnData(lastTurnData)
 
   bankStore.processMonthlyBank()
-  const newsEvent = worldStore.updateWorldState(gameStore.year, gameStore.month)
-  if (newsEvent) gameStore.setNews(newsEvent)
+  let worldEvent = worldStore.updateWorldState(gameStore.year, gameStore.month)
+  const finalNews = emergentEvent || worldEvent 
+  if (finalNews) gameStore.setNews(finalNews)
 
   gameStore.nextTurn()
   playerStore.clearReports()
-  
-  // FINAL STEP: Recalculate idle workers after turn adjustments
   playerStore.recalculateIdleWorkers()
-  
   debugStore.setSnapshot(turnSnapshot)
   if (gameStore.currentSlotId) savesStore.saveGame(gameStore.currentSlotId, playerStore.companyName)
 
@@ -392,5 +382,5 @@ export function processEndTurn() {
   if (bankStore.missedPayments >= 3 || bankStore.insolventMonths >= 3) gameStatus = 'bankrupt'
   else if (gameStore.year >= 2008) gameStatus = 'victory'
 
-  return { newsEvent, gameStatus }
+  return { newsEvent: finalNews, gameStatus }
 }
