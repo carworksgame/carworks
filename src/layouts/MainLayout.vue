@@ -2,15 +2,6 @@
   <q-layout view="lHh Lpr lFf">
     <q-header elevated class="bg-brown-8">
       <q-toolbar>
-        <q-btn
-          flat
-          dense
-          round
-          icon="menu"
-          aria-label="Menu"
-          @click="toggleLeftDrawer"
-        />
-
         <q-toolbar-title class="text-weight-bolder">
           CarWorks <span v-if="playerStore.companyName" class="text-weight-light text-subtitle1 q-ml-sm">- {{ playerStore.companyName }}</span>
         </q-toolbar-title>
@@ -55,93 +46,29 @@
       </q-toolbar>
     </q-header>
 
-    <q-drawer
-      v-model="leftDrawerOpen"
-      show-if-above
-      bordered
-      class="bg-grey-2"
-    >
-      <q-list>
-        <q-item-label header>Management</q-item-label>
-        
-        <q-item clickable v-ripple to="/saves">
-          <q-item-section avatar>
-            <q-icon name="cloud_upload" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Cloud Saves</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item-label header>Departments</q-item-label>
-        
-        <q-item clickable v-ripple to="/" exact>
-          <q-item-section avatar>
-            <q-icon name="home" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>The Factory</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable v-ripple to="/office">
-          <q-item-section avatar>
-            <q-icon name="business" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Manager's Office</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable v-ripple to="/research">
-          <q-item-section avatar>
-            <q-icon name="science" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>R&D Lab</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable v-ripple to="/design">
-          <q-item-section avatar>
-            <q-icon name="drive_eta" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Design Workshop</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable v-ripple to="/manufacturing">
-          <q-item-section avatar>
-            <q-icon name="factory" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Manufacturing & Sales</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable v-ripple to="/marketing">
-          <q-item-section avatar>
-            <q-icon name="campaign" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Marketing Dept</q-item-label>
-          </q-item-section>
-        </q-item>
-
-      </q-list>
-    </q-drawer>
-
     <q-page-container>
       <router-view />
     </q-page-container>
 
-    <!-- Floating Back to Factory Button -->
-    <q-page-sticky v-if="route.path !== '/'" position="bottom-right" :offset="[18, 18]" style="z-index: 2000">
-      <q-btn fab icon="factory" color="brown-9" @click="router.push('/')">
-        <q-tooltip anchor="center left" self="center right">Return to Factory Hub</q-tooltip>
-      </q-btn>
-    </q-page-sticky>
+    <!-- Bottom Navigation Bar -->
+    <q-footer elevated class="bg-brown-10 text-white">
+      <q-tabs 
+        v-model="currentTab" 
+        indicator-color="transparent" 
+        active-color="orange-9" 
+        class="bottom-nav"
+        align="justify"
+        dense
+      >
+        <q-route-tab to="/" icon="factory" label="The Hub" class="nav-tab" />
+        <q-route-tab to="/office" icon="business" label="Office" class="nav-tab" />
+        <q-route-tab to="/research" icon="science" label="R&D Lab" class="nav-tab" />
+        <q-route-tab to="/design" icon="drive_eta" label="Design" class="nav-tab" />
+        <q-route-tab to="/manufacturing" icon="precision_manufacturing" label="Produce" class="nav-tab" />
+        <q-route-tab to="/marketing" icon="campaign" label="Market" class="nav-tab" />
+        <q-route-tab to="/saves" icon="cloud_upload" label="Saves" class="nav-tab" />
+      </q-tabs>
+    </q-footer>
 
     <!-- Global Settings Dialog -->
     <q-dialog v-model="showSettingsDialog">
@@ -355,7 +282,7 @@ const reportsStore = useReportsStore()
 const router = useRouter()
 const route = useRoute()
 
-const leftDrawerOpen = ref(false)
+const currentTab = ref('factory')
 const showNewsDialog = ref(false)
 const confirmEndTurn = ref(false)
 const isProcessingTurn = ref(false)
@@ -373,10 +300,6 @@ const nextMonthString = computed(() => {
   const date = new Date(nextYear, nextMonth)
   return date.toLocaleString('default', { month: 'long', year: 'numeric' })
 })
-
-function toggleLeftDrawer () {
-  leftDrawerOpen.value = !leftDrawerOpen.value
-}
 
 async function handleEndTurn () {
   isProcessingTurn.value = true
@@ -436,5 +359,18 @@ onMounted(async () => {
 <style scoped>
 .transition-overlay {
   transition: all 0.5s ease;
+}
+.bottom-nav {
+  height: 70px;
+}
+.nav-tab {
+  min-width: 100px;
+}
+:deep(.q-tab__icon) {
+  font-size: 32px;
+}
+:deep(.q-tab__label) {
+  font-size: 11px;
+  font-weight: bold;
 }
 </style>
