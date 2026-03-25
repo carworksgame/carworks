@@ -269,9 +269,12 @@ export function processEndTurn() {
 
       availableModels.forEach(m => { 
         m.desirability = calculateDesirability(m, segmentClass) 
-        lastTurnData.modelComparison[territory.name][segmentClass].push({
-          owner: companyStats[m.ownerId]?.name || m.ownerId, model: m.name, price: m.price, desirability: m.desirability
-        })
+        // Only include in comparison report if it's the intended segment for this car
+        if (m.vehicleClass === segmentClass) {
+          lastTurnData.modelComparison[territory.name][segmentClass].push({
+            owner: companyStats[m.ownerId]?.name || m.ownerId, model: m.name, price: m.price, desirability: m.desirability
+          })
+        }
       })
 
       const totalDesirability = availableModels.reduce((acc, m) => acc + m.desirability, 0)

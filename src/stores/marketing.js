@@ -8,7 +8,13 @@ export const useMarketingStore = defineStore('marketing', {
       'north-america': 10,
       'europe': 0,
       'south-america': 0,
-      'asia': 0
+      'east-asia': 0,
+      'south-asia': 0,
+      'middle-east': 0,
+      'oceania': 0,
+      'russia-bloc': 0,
+      'africa': 0,
+      'central-america': 0
     },
     // Regional Campaigns: territoryId -> { modelId -> { mediaTypeId -> amount } }
     activeRegionalCampaigns: {}, 
