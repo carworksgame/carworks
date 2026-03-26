@@ -55,9 +55,7 @@ export function processEndTurn() {
     companyStats[c.id] = { name: c.name, production: 0, sales: 0, profit: 0 }
   })
 
-  console.log('--- Processing End of Turn ---')
-  
-  // 0. Update Talent Pools & Check for New AI Entries
+  // 0. Update Talent Pools
   worldStore.territories.forEach(territory => {
     let growth = Math.floor(territory.population / 1000000) * 5
     const factory = playerStore.factories.find(f => f.territory === territory.id)
@@ -68,142 +66,178 @@ export function processEndTurn() {
     territory.talentPool = Math.min(5000, territory.talentPool + growth)
   })
 
-  // Emergent Rivals (Every 25 years if slot available)
+  // Emergent Rivals
   let emergentEvent = null
   if (gameStore.turnCount > 0 && gameStore.turnCount % 300 === 0 && competitorStore.competitors.length < 4) {
     const newRival = competitorStore.spawnNewRival(gameStore.year)
-    if (newRival) {
-      emergentEvent = { title: 'NEW COMPETITOR!', description: `${newRival.name} has been founded in ${newRival.homeTerritory.toUpperCase()}!`, type: 'competition' }
-    }
+    if (newRival) emergentEvent = { title: 'NEW COMPETITOR!', description: `${newRival.name} has been founded!`, type: 'competition' }
   }
 
   researchStore.updateAvailableTech(gameStore.year)
   competitorStore.processAITurns(gameStore.year, researchStore.availableTech)
 
   const techProd = playerStore.getTechnicianProductivity
-  const originalProgressPerTech = researchStore.progressPerTech
-  researchStore.progressPerTech = Math.round(originalProgressPerTech * techProd)
-  const completedTechs = researchStore.progressResearch()
-  if (completedTechs && completedTechs.length > 0) {
-    if (!gameStore.lastNewsEvent) {
-       gameStore.setNews({ title: 'R&D BREAKTHROUGH!', description: `Our technicians have successfully developed ${completedTechs[0]}!`, type: 'growth' })
-    }
-  }
-  researchStore.progressPerTech = originalProgressPerTech 
+  researchStore.progressPerTech = Math.round(200 * techProd) 
+  researchStore.progressResearch()
 
   marketingStore.processMonthlyBrandGrowth()
 
-  // 3. Unified Production Simulation
-  let totalProductionCosts = 0, totalShippingCosts = 0
-  const activeModels = designStore.models
-  const factoryAggregator = {}
+  // 3. PRODUCTION
+  let totalProductionCosts = 0
+  const factoryModelPools = {} 
   
   playerStore.factories.forEach(f => {
-    const satisfaction = playerStore.getFactorySatisfaction(f.id)
-    let strikeBonus = 1.0
-    if (satisfaction < 0.7 && Math.random() < 0.1) {
-      strikeBonus = 0 
-      gameStore.setNews({ title: `STRIKE in ${f.location}!`, description: 'Workers are striking for better pay.', type: 'crisis' })
-    }
-    const productivity = playerStore.getFactoryProductivity(f.id) * strikeBonus
-    factoryAggregator[f.id] = { owner: 'player', productivity, territory: f.territory, level: f.level, requests: [] }
-    turnSnapshot.production[f.id] = { owner: 'Player', location: f.location, capacity: f.totalWorkers * productivity, totalRequested: 0, actualOutput: 0 }
-  })
-
-  competitorStore.competitors.forEach(comp => {
-    comp.factories.forEach(f => {
-      const productivity = f.productivity
-      factoryAggregator[f.id] = { owner: comp.id, productivity, territory: f.territory, level: f.level, requests: [] }
-      turnSnapshot.production[f.id] = { owner: comp.name, location: f.location, capacity: f.employees * productivity, totalRequested: 0, actualOutput: 0 }
-      aiFinanceMap[comp.id].salaries += f.employees * (f.salary || 50)
-      aiFinanceMap[comp.id].maintenance += 500
+    const productivity = playerStore.getFactoryProductivity(f.id)
+    const assignments = playerStore.factoryAssignments[f.id] || {}
+    factoryModelPools[f.id] = {}
+    
+    Object.keys(assignments).forEach(mId => {
+      const workers = assignments[mId]
+      const model = designStore.models.find(m => m.id == mId)
+      if (workers > 0 && model) {
+        const output = Math.floor(workers * productivity)
+        factoryModelPools[f.id][mId] = output
+        const unitCostDiscount = 1 - ((f.level - 1) * 0.05)
+        const finalUnitCost = Math.round(model.cost * worldStore.inflationMultiplier * unitCostDiscount)
+        totalProductionCosts += output * finalUnitCost
+        companyStats.player.production += output
+      }
     })
-    const activeTerritories = worldStore.territories.filter(t => t.active)
-    aiFinanceMap[comp.id].lease += activeTerritories.length * 200
+    turnSnapshot.production[f.id] = { owner: 'Player', location: f.location, capacity: f.totalWorkers * productivity, actualOutput: companyStats.player.production }
   })
 
-  activeModels.forEach(model => {
-    worldStore.territories.forEach(salesTerritory => {
-      const config = playerStore.productionConfig[model.id]?.[salesTerritory.id] || { assignedWorkers: 0 }
-      if (config.assignedWorkers > 0) {
-        const factoryId = playerStore.supplyLines[salesTerritory.id]
-        if (factoryId && factoryAggregator[factoryId]) {
-          factoryAggregator[factoryId].requests.push({ model, salesTerritoryId: salesTerritory.id, workers: config.assignedWorkers })
-          turnSnapshot.production[factoryId].totalRequested += Math.floor(config.assignedWorkers * factoryAggregator[factoryId].productivity)
-        }
+  // AI Production & Logistics
+  competitorStore.competitors.forEach(comp => {
+    const compModel = comp.models[0]
+    aiFinanceMap[comp.id].salaries += comp.factories[0].employees * (comp.factories[0].salary || 50)
+    aiFinanceMap[comp.id].maintenance += 500
+    
+    const totalProd = Math.floor(comp.factories[0].employees * comp.factories[0].productivity)
+    aiFinanceMap[comp.id].productionCosts += totalProd * Math.round(compModel.cost * worldStore.inflationMultiplier)
+    companyStats[comp.id].production = totalProd
+
+    // AI Dynamic Shipping
+    const unlocked = comp.unlockedTerritories || [comp.homeTerritory]
+    const amountPerTerritory = Math.floor(totalProd / unlocked.length)
+    unlocked.forEach(tId => {
+      competitorStore.addToInventory(comp.id, compModel.id, tId, amountPerTerritory)
+      if (tId !== comp.homeTerritory) {
+        const shipRate = worldStore.getShippingCost(comp.homeTerritory, tId)
+        aiFinanceMap[comp.id].shipping += amountPerTerritory * shipRate
       }
     })
   })
 
-  const activeTerritoryIds = worldStore.territories.filter(t => t.active).map(t => t.id)
-  competitorStore.competitors.forEach(comp => {
-    const compModel = comp.models[0]
-    comp.factories.forEach(f => {
-      const workersPerTerritory = Math.floor(f.employees / (activeTerritoryIds.length || 1))
-      activeTerritoryIds.forEach(tId => {
-        factoryAggregator[f.id].requests.push({ owner: comp.id, model: compModel, salesTerritoryId: tId, workers: workersPerTerritory })
-        turnSnapshot.production[f.id].totalRequested += Math.floor(workersPerTerritory * factoryAggregator[f.id].productivity)
+  // 4. DISTRIBUTION & SALES
+  let totalSalesIncome = 0, totalShippingCosts = 0
+  const shares = { player: 0 }
+  const segments = getMarketSegments(gameStore.year)
+  const baseMarketPrice = getBaseMarketPrice(gameStore.year)
+  const playerReputationFactor = playerStore.reputation / 50 
+
+  // PRE-PASS: Calculate Demand
+  const regionalModelDemand = {}
+  worldStore.territories.forEach(territory => {
+    if (!territory.active) return
+    regionalModelDemand[territory.id] = {}
+    const territoryDemandBase = (territory.population / 100000) * territory.wealth * worldStore.globalDemandMultiplier
+    const regAwareness = marketingStore.getAwareness(territory.id)
+    const showroomCount = playerStore.regionalShowrooms[territory.id] || 0
+    const presenceFactor = 1.0 + (showroomCount * 0.05)
+
+    Object.keys(segments).forEach(segmentClass => {
+      const segmentShare = segments[segmentClass]
+      const segmentDemandBase = territoryDemandBase * segmentShare
+      designStore.models.forEach(m => {
+        if (m.vehicleClass !== segmentClass) return
+        const dist = playerStore.regionalDistribution[territory.id]?.[m.id]
+        if (!dist || dist.price <= 0) return
+        let classMultiplier = 2.0
+        let maxPriceFactor = m.vehicleClass === VEHICLE_CLASSES.LUXURY ? 5.0 : 2.0
+        const affordabilityCap = baseMarketPrice * maxPriceFactor
+        let stickerShock = 1.0
+        if (dist.price > affordabilityCap) {
+          stickerShock = Math.pow(0.1, (dist.price / (affordabilityCap || 1)) * 2)
+          if (isNaN(stickerShock)) stickerShock = 0.0001
+          classMultiplier *= stickerShock
+        }
+        const modelBoost = marketingStore.getBoostForModel(m.id, territory.id)
+        const economy = m.stats.realEconomy !== undefined ? m.stats.realEconomy : (m.stats.economy || 10)
+        const safety = m.stats.realSafety !== undefined ? m.stats.realSafety : (m.stats.safety || 10)
+        const perfWeight = m.vehicleClass === VEHICLE_CLASSES.SPORT ? 4.0 : 1.0
+        const econWeight = m.vehicleClass === VEHICLE_CLASSES.ECONOMY ? 2.5 : 1.0
+        const baseScore = ((m.stats.pwrRatio * perfWeight) + (economy * econWeight) + (safety / 5)) * classMultiplier
+        const priceFactor = (dist.price / (baseMarketPrice / 2))
+        const desirability = (baseScore / (priceFactor || 1)) * modelBoost * (1 + (regAwareness / 100)) * playerReputationFactor * presenceFactor
+        const demand = Math.floor(segmentDemandBase * Math.min(1.0, desirability / 10))
+        regionalModelDemand[territory.id][m.id] = (regionalModelDemand[territory.id][m.id] || 0) + demand
       })
     })
   })
 
-  Object.keys(factoryAggregator).forEach(fId => {
-    const factory = factoryAggregator[fId]
-    factory.requests.forEach(req => {
-      const actualProduction = Math.floor(req.workers * factory.productivity)
-      if (actualProduction > 0) {
-        const unitCostDiscount = 1 - ((factory.level - 1) * 0.05)
-        const finalUnitCost = Math.round(req.model.cost * worldStore.inflationMultiplier * unitCostDiscount)
-        const shipRate = worldStore.getShippingCost(factory.territory, req.salesTerritoryId)
-        const shipCost = actualProduction * shipRate
-        companyStats[factory.owner].production += actualProduction
-        if (factory.owner === 'player') {
-          totalProductionCosts += finalUnitCost * actualProduction
-          totalShippingCosts += shipCost
-          playerStore.addToInventory(req.model.id, req.salesTerritoryId, actualProduction)
-          if (!lastTurnData.modelReport[req.model.name]) lastTurnData.modelReport[req.model.name] = {}
-          const territoryName = worldStore.territories.find(t => t.id === req.salesTerritoryId)?.name || req.salesTerritoryId
-          if (!lastTurnData.modelReport[req.model.name][territoryName]) lastTurnData.modelReport[req.model.name][territoryName] = { built: 0, sold: 0, stock: 0 }
-          lastTurnData.modelReport[req.model.name][territoryName].built += actualProduction
-        } else {
-          aiFinanceMap[factory.owner].productionCosts += finalUnitCost * actualProduction
-          aiFinanceMap[factory.owner].shipping += shipCost
-          competitorStore.addToInventory(factory.owner, req.model.id, req.salesTerritoryId, actualProduction)
-        }
-        turnSnapshot.production[fId].actualOutput += actualProduction
+  // DISTRIBUTION EXECUTION
+  const distributeModel = (mId, passFunc) => {
+    const candidates = []
+    let totalDemandInPass = 0
+    worldStore.territories.forEach(t => {
+      if (!t.active) return
+      const fId = passFunc(t.id, mId); if (fId && factoryModelPools[fId]?.[mId] > 0) {
+        const demand = Math.max(0, (regionalModelDemand[t.id][mId] || 0) - playerStore.getInventory(mId, t.id))
+        if (demand > 0) { candidates.push({ tId: t.id, fId, demand }); totalDemandInPass += demand }
       }
     })
+    candidates.forEach(c => {
+      const pool = factoryModelPools[c.fId][mId]
+      const shareOfPool = totalDemandInPass > 0 ? (c.demand / totalDemandInPass) : 0
+      const amountToMove = Math.floor(Math.min(pool * shareOfPool, c.demand))
+      if (amountToMove > 0) {
+        factoryModelPools[c.fId][mId] -= amountToMove; playerStore.addToInventory(mId, c.tId, amountToMove)
+        const factory = playerStore.factories.find(f => f.id == c.fId)
+        totalShippingCosts += amountToMove * worldStore.getShippingCost(factory.territory, c.tId)
+        const mName = designStore.models.find(m => m.id == mId).name
+        if (!lastTurnData.modelReport[mName]) lastTurnData.modelReport[mName] = {}
+        const tName = worldStore.territories.find(t => t.id === c.tId).name
+        if (!lastTurnData.modelReport[mName][tName]) lastTurnData.modelReport[mName][tName] = { built: 0, sold: 0, stock: 0 }
+        lastTurnData.modelReport[mName][tName].built += amountToMove
+      }
+    })
+  }
+
+  designStore.models.forEach(model => {
+    distributeModel(model.id, (tId, mId) => {
+      const pri1 = playerStore.regionalDistribution[tId]?.[mId]?.priorities[0]
+      const factory = playerStore.factories.find(f => f.id == pri1)
+      return (factory && factory.territory === tId) ? pri1 : null
+    })
+    distributeModel(model.id, (tId, mId) => playerStore.regionalDistribution[tId]?.[mId]?.priorities[0])
+    distributeModel(model.id, (tId, mId) => playerStore.regionalDistribution[tId]?.[mId]?.priorities[1])
+    distributeModel(model.id, (tId, mId) => playerStore.regionalDistribution[tId]?.[mId]?.priorities[2])
   })
 
-  // 4. Sales Simulation
-  let totalSalesIncome = 0
-  const shares = { player: 0 }
-  const segments = getMarketSegments(gameStore.year)
-  const baseMarketPrice = getBaseMarketPrice(gameStore.year)
-  const reputationFactor = playerStore.reputation / 50 
-
+  // 5. SALES EXECUTION
   worldStore.territories.forEach(territory => {
     if (!territory.active) return
     const territoryDemandBase = (territory.population / 100000) * territory.wealth * worldStore.globalDemandMultiplier
-    const regAwareness = marketingStore.getAwareness(territory.id)
+    const playerRegAwareness = marketingStore.getAwareness(territory.id)
+    const playerPresenceFactor = 1.0 + ((playerStore.regionalShowrooms[territory.id] || 0) * 0.05)
     turnSnapshot.sales[territory.id] = { name: territory.name, segments: {} }
 
     Object.keys(segments).forEach(segmentClass => {
-      const segmentShare = segments[segmentClass]
-      const segmentDemand = territoryDemandBase * segmentShare
+      const segmentShare = segments[segmentClass], segmentDemand = territoryDemandBase * segmentShare
       const availableModels = []
       turnSnapshot.sales[territory.id].segments[segmentClass] = { demand: Math.floor(segmentDemand), models: [] }
       if (!lastTurnData.modelComparison[territory.name]) lastTurnData.modelComparison[territory.name] = {}
       lastTurnData.modelComparison[territory.name][segmentClass] = []
 
-      activeModels.forEach(m => {
+      designStore.models.forEach(m => {
         const inventory = playerStore.inventory[m.id]?.[territory.id] || 0
-        const config = playerStore.productionConfig[m.id]?.[territory.id] || { price: 0 }
-        if (inventory > 0 && config.price > 0) {
+        const config = playerStore.regionalDistribution[territory.id]?.[m.id]
+        if (inventory > 0 && config && config.price > 0) {
           const modelBoost = marketingStore.getBoostForModel(m.id, territory.id)
           availableModels.push({
             ownerId: 'player', modelId: m.id, name: m.name, vehicleClass: m.vehicleClass || VEHICLE_CLASSES.UTILITY,
-            price: config.price, stats: m.stats, inventory, marketingBoost: modelBoost * (1 + (regAwareness / 100)) * reputationFactor
+            price: config.price, stats: m.stats, inventory, marketingBoost: modelBoost * (1 + (playerRegAwareness / 100)) * playerReputationFactor * playerPresenceFactor,
+            presenceFactor: playerPresenceFactor
           })
         }
       })
@@ -212,9 +246,11 @@ export function processEndTurn() {
         comp.models.forEach(m => {
           const inventory = comp.regionalInventory[m.id]?.[territory.id] || 0
           if (inventory > 0) {
+            const compPresence = 1.0 + ((comp.regionalShowrooms[territory.id] || 0) * 0.05)
             availableModels.push({
               ownerId: comp.id, modelId: m.id, name: m.name, vehicleClass: m.vehicleClass || VEHICLE_CLASSES.UTILITY,
-              price: Math.round(m.price * worldStore.inflationMultiplier), stats: m.stats, inventory, marketingBoost: 1.2
+              price: Math.round(m.price * worldStore.inflationMultiplier), stats: m.stats, inventory, marketingBoost: 1.2 * (comp.reputation / 50) * compPresence,
+              presenceFactor: compPresence
             })
           }
         })
@@ -225,32 +261,22 @@ export function processEndTurn() {
       function calculateDesirability(m, targetSegment) {
         const isCorrectClass = m.vehicleClass === targetSegment
         let classMultiplier = isCorrectClass ? 2.0 : 0.2
-        let maxPriceFactor = 2.0
-        if (targetSegment === VEHICLE_CLASSES.ECONOMY) maxPriceFactor = 1.2
-        if (targetSegment === VEHICLE_CLASSES.LUXURY) maxPriceFactor = 5.0
-        if (targetSegment === VEHICLE_CLASSES.SPORT) maxPriceFactor = 3.5
-        if (targetSegment === VEHICLE_CLASSES.UTILITY) maxPriceFactor = 1.8
+        let maxPriceFactor = targetSegment === VEHICLE_CLASSES.LUXURY ? 5.0 : 2.0
         const affordabilityCap = baseMarketPrice * maxPriceFactor
         let stickerShock = 1.0
         if (m.price > affordabilityCap) {
-          const overageRatio = m.price / (affordabilityCap || 1)
-          stickerShock = Math.pow(0.1, overageRatio * 2); if (isNaN(stickerShock)) stickerShock = 0.0001
+          stickerShock = Math.pow(0.1, (m.price / (affordabilityCap || 1)) * 2)
+          if (isNaN(stickerShock)) stickerShock = 0.0001
           classMultiplier *= stickerShock
         }
-        const economy = m.stats.realEconomy !== undefined ? m.stats.realEconomy : m.stats.economy
-        const safety = m.stats.realSafety !== undefined ? m.stats.realSafety : m.stats.safety
-        let perfWeight = 1.0, econWeight = 1.0, safetyWeight = 1.0, priceWeight = 1.0
-        if (targetSegment === VEHICLE_CLASSES.ECONOMY) { priceWeight = 4.0; econWeight = 2.5; perfWeight = 0.5 }
-        else if (targetSegment === VEHICLE_CLASSES.LUXURY) { priceWeight = 0.3; safetyWeight = 3.5; perfWeight = 1.5 }
-        else if (targetSegment === VEHICLE_CLASSES.SPORT) { perfWeight = 4.0; priceWeight = 1.2; econWeight = 0.2 }
-        else if (targetSegment === VEHICLE_CLASSES.UTILITY) { perfWeight = 1.0; econWeight = 1.0; safetyWeight = 2.0 }
-        const perfScore = (m.stats.pwrRatio * perfWeight)
-        const econScore = (economy * econWeight)
-        const safetyScore = (safety / 5 * safetyWeight)
-        const baseScore = (perfScore + econScore + safetyScore) * classMultiplier
-        const priceFactor = (m.price / (baseMarketPrice / 2)) * priceWeight
+        const economy = m.stats.realEconomy !== undefined ? m.stats.realEconomy : (m.stats.economy || 10)
+        const safety = m.stats.realSafety !== undefined ? m.stats.realSafety : (m.stats.safety || 10)
+        const perfWeight = targetSegment === VEHICLE_CLASSES.SPORT ? 4.0 : 1.0
+        const econWeight = targetSegment === VEHICLE_CLASSES.ECONOMY ? 2.5 : 1.0
+        const baseScore = ((m.stats.pwrRatio * perfWeight) + (economy * econWeight) + (safety / 5)) * classMultiplier
+        const priceFactor = (m.price / (baseMarketPrice / 2))
         const value = (baseScore / (priceFactor || 1)) || 0.00001 
-        m.debugData = { affordabilityCap, stickerShock, priceFactor }
+        m.debugData = { affordabilityCap, stickerShock, presenceFactor: m.presenceFactor }
         return isNaN(value) ? 0.00001 : value
       }
 
@@ -272,8 +298,7 @@ export function processEndTurn() {
         companyStats[m.ownerId].sales += actualSales
         if (m.ownerId === 'player') {
           totalSalesIncome += actualSales * m.price
-          playerStore.removeFromInventory(m.modelId, territory.id, actualSales)
-          shares.player += actualSales
+          playerStore.removeFromInventory(m.modelId, territory.id, actualSales); shares.player += actualSales
           if (!lastTurnData.incomeByModel[m.name]) lastTurnData.incomeByModel[m.name] = 0
           lastTurnData.incomeByModel[m.name] += actualSales * m.price
           if (!lastTurnData.incomeByRegion[territory.name]) lastTurnData.incomeByRegion[territory.name] = 0
@@ -281,34 +306,22 @@ export function processEndTurn() {
           if (!lastTurnData.modelReport[m.name]) lastTurnData.modelReport[m.name] = {}
           if (!lastTurnData.modelReport[m.name][territory.name]) lastTurnData.modelReport[m.name][territory.name] = { built: 0, sold: 0, stock: 0 }
           lastTurnData.modelReport[m.name][territory.name].sold += actualSales
-
-          const safety = m.stats.realSafety || m.stats.safety
-          const durability = m.stats.durability || 30
-          const riskProbability = ((100 - safety) + (100 - durability)) * (actualSales / 10000)
-          if (Math.random() < (riskProbability / 100)) {
-             designStore.addIssue({
-               modelId: m.modelId, modelName: m.name, territoryId: territory.id, territoryName: territory.name,
-               type: Math.random() > 0.5 ? 'Safety Defect' : 'Reliability Failure',
-               costToFix: Math.round(actualSales * (m.price * 0.15))
-             })
-             gameStore.setNews({ title: `SCANDAL: ${m.name}!`, description: `Reports of ${m.name} failures in ${territory.name} are trending. Reputation at risk!`, type: 'crisis' })
-          }
         } else {
-          if (!shares[m.ownerId]) shares[m.ownerId] = 0
-          shares[m.ownerId] += actualSales
+          shares[m.ownerId] = (shares[m.ownerId] || 0) + actualSales
           aiFinanceMap[m.ownerId].income += actualSales * m.price
           competitorStore.removeFromInventory(m.ownerId, m.modelId, territory.id, actualSales)
         }
         turnSnapshot.sales[territory.id].segments[segmentClass].models.push({
           name: m.name, owner: companyStats[m.ownerId]?.name || m.ownerId, desirability: m.desirability, share: shareOfPool,
-          potential: Math.floor(salesPotential), actual: actualSales, price: m.price, inventory: m.inventory, pricing: m.debugData
+          actual: actualSales, price: m.price, pricing: m.debugData
         })
       })
     })
   })
 
+  // Final Reports & Finances
   Object.keys(lastTurnData.modelReport).forEach(mName => {
-    const model = activeModels.find(m => m.name === mName)
+    const model = designStore.models.find(m => m.name === mName)
     if (model) {
       Object.keys(lastTurnData.modelReport[mName]).forEach(tName => {
         const territory = worldStore.territories.find(t => t.name === tName)
@@ -321,40 +334,6 @@ export function processEndTurn() {
   const normalizedShares = {}
   Object.keys(shares).forEach(id => { normalizedShares[id] = Math.round((shares[id] / (totalSalesThisTurn || 1)) * 100) })
   competitorStore.updateMarketShare(normalizedShares)
-
-  if (shares.player > 0) playerStore.changeReputation(0.1)
-  playerStore.addReputationHistory(gameStore.dateString)
-
-  // 4.5 Expos & 4.6 Bankruptcy Alerts
-  const currentExpo = worldStore.upcomingExpos.find(e => e.year === gameStore.year && e.month === gameStore.month)
-  if (currentExpo) {
-    let resultTitle = 'Expo results are in!', win = false
-    if (worldStore.participatingModelId) {
-      const model = activeModels.find(m => m.id === worldStore.participatingModelId)
-      if (model) {
-        const expoScore = (model.stats.realSafety || 50) + (model.stats.pwrRatio * 5) + playerStore.reputation
-        if (expoScore > 150 + (Math.random() * 100)) {
-          win = true; playerStore.changeReputation(10)
-          marketingStore.regionalAwareness[currentExpo.territoryId] = Math.min(100, (marketingStore.regionalAwareness[currentExpo.territoryId] || 0) + 25)
-          resultTitle = `VICTORY AT ${currentExpo.name.toUpperCase()}!`
-        }
-      }
-    }
-    gameStore.setNews({ title: resultTitle, description: win ? 'Best in Show!' : 'Expo concluded.', type: win ? 'growth' : 'recovery' })
-    worldStore.clearExpos()
-  }
-
-  // Check for AI distress
-  competitorStore.competitors.forEach(comp => {
-    if (comp.status === 'distressed' && !gameStore.lastNewsEvent) {
-      gameStore.setNews({ title: 'DISTRESS SALE!', description: `${comp.name} is facing insolvency. Their assets are available for acquisition in the Manager's Office.`, type: 'crisis' })
-    }
-  })
-
-  if (worldStore.upcomingExpos.length === 0 && gameStore.turnCount % 24 === 0) {
-    const randomTerritory = worldStore.territories[Math.floor(Math.random() * worldStore.territories.length)]
-    worldStore.scheduleExpo(`${randomTerritory.name} Auto Show ${gameStore.year + 1}`, randomTerritory.id, gameStore.year + 1, 5)
-  }
 
   competitorStore.processMonthlyFinances(aiFinanceMap)
   playerStore.processMonthlyFinances({
@@ -369,12 +348,10 @@ export function processEndTurn() {
 
   bankStore.processMonthlyBank()
   let worldEvent = worldStore.updateWorldState(gameStore.year, gameStore.month)
-  const finalNews = emergentEvent || worldEvent 
-  if (finalNews) gameStore.setNews(finalNews)
+  if (emergentEvent || worldEvent) gameStore.setNews(emergentEvent || worldEvent)
 
   gameStore.nextTurn()
-  playerStore.clearReports()
-  playerStore.recalculateIdleWorkers()
+  playerStore.clearReports(); playerStore.recalculateIdleWorkers()
   debugStore.setSnapshot(turnSnapshot)
   if (gameStore.currentSlotId) savesStore.saveGame(gameStore.currentSlotId, playerStore.companyName)
 
@@ -382,5 +359,5 @@ export function processEndTurn() {
   if (bankStore.missedPayments >= 3 || bankStore.insolventMonths >= 3) gameStatus = 'bankrupt'
   else if (gameStore.year >= 2008) gameStatus = 'victory'
 
-  return { newsEvent: finalNews, gameStatus }
+  return { newsEvent: emergentEvent || worldEvent, gameStatus }
 }

@@ -44,7 +44,7 @@ export const useDesignStore = defineStore('design', {
         { id: 'multi-valve', name: 'Multi-Valve I4', cost: 12000, power: 190, weight: 450, economy: 35, requires: 'multi-valve' },
         { id: 'vvt-engine', name: 'VVT Engine', cost: 18000, power: 260, weight: 480, economy: 42, requires: 'vvt-engine' },
         { id: 'early-hybrid', name: 'Hybrid Drive', cost: 35000, power: 200, weight: 1100, economy: 65, requires: 'early-hybrid' },
-        { id: 'modern-electric', name: 'Electric Drive', cost: 60000, power: 450, weight: 1500, economy: 120, requires: 'modern-electric' },
+        { id: 'modern-electric', name: 'Li-Ion Electric Drive', cost: 60000, power: 450, weight: 1500, economy: 120, requires: 'modern-electric' },
       ],
       steering: [
         { id: 'tiller-steering', name: 'Tiller', cost: 30, safety: 2, weight: 10 },
@@ -72,7 +72,7 @@ export const useDesignStore = defineStore('design', {
         { id: 'car-heater', name: 'Interior Heater', cost: 500, safety: 0, weight: 40, requires: 'car-heater' },
         { id: 'seat-belts', name: 'Lap Belts', cost: 300, safety: 30, weight: 10, requires: 'seat-belts' },
         { id: 'air-conditioning', name: 'Air Conditioning', cost: 4500, safety: 0, weight: 120, requires: 'air-conditioning' },
-        { id: 'disc-brakes', name: 'Safety Glass', cost: 1000, safety: 10, weight: 50, requires: 'disc-brakes' }, // Shared tech
+        { id: 'disc-brakes', name: 'Safety Glass', cost: 1000, safety: 10, weight: 50, requires: 'disc-brakes' }, 
         { id: 'power-windows', name: 'Power Windows', cost: 2500, safety: 0, weight: 60, requires: 'power-windows' },
         { id: 'collapsible-column', name: 'Safety Column', cost: 2000, safety: 15, weight: 20, requires: 'collapsible-column' },
         { id: 'cd-player', name: 'CD Player', cost: 1200, safety: 0, weight: 10, requires: 'cd-player' },
@@ -99,12 +99,11 @@ export const useDesignStore = defineStore('design', {
   getters: {
     getUnlockedComponents: (state) => (unlockedTech) => {
       const worldStore = useWorldStore()
-      const inflation = worldStore.inflationMultiplier
       const filtered = {}
       for (const cat in state.components) {
         filtered[cat] = state.components[cat]
           .filter(comp => !comp.requires || unlockedTech.includes(comp.requires))
-          .map(comp => ({ ...comp, cost: Math.round(comp.cost * inflation) }))
+          .map(comp => ({ ...comp, cost: Math.round(comp.cost * worldStore.inflationMultiplier) }))
       }
       return filtered
     }
@@ -147,6 +146,9 @@ export const useDesignStore = defineStore('design', {
     finalizePrototype() {
       if (!this.activePrototype) return
       const gameStore = useGameStore()
+      const playerStore = usePlayerStore()
+      const worldStore = useWorldStore()
+
       const finalStats = {
         ...this.activePrototype.stats,
         realEconomy: this.activePrototype.results.economy || this.activePrototype.stats.economy,
@@ -155,7 +157,8 @@ export const useDesignStore = defineStore('design', {
         realBraking: this.activePrototype.results.braking || 0,
         durability: this.durabilityMatrix[this.activePrototype.components.chassis] || 30
       }
-      this.models.push({
+      
+      const newModel = {
         name: this.activePrototype.name,
         vehicleClass: this.activePrototype.vehicleClass,
         cost: this.activePrototype.cost,
@@ -164,7 +167,17 @@ export const useDesignStore = defineStore('design', {
         components: this.activePrototype.components,
         id: Date.now(),
         introduced: gameStore.year
+      }
+
+      this.models.push(newModel)
+
+      // INITIALIZE LOGISTICS for the new model across all active territories
+      worldStore.territories.forEach(t => {
+        if (t.active) {
+          playerStore.initializeDistribution(newModel.id, t.id)
+        }
       })
+
       this.activePrototype = null
     },
 

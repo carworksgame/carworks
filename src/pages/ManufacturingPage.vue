@@ -1,125 +1,147 @@
 <template>
   <q-page padding class="bg-grey-2">
-    <div class="text-h4 q-mb-md">Manufacturing & Global Sales</div>
+    <div class="row items-center q-mb-md">
+      <div class="text-h4">Manufacturing & Global Logistics</div>
+      <q-space />
+      <q-tabs v-model="viewTab" dense class="bg-white rounded-borders shadow-1" active-color="orange-9" indicator-color="orange-9">
+        <q-tab name="production" icon="factory" label="Factory Production" />
+        <q-tab name="distribution" icon="local_shipping" label="Regional Distribution" />
+      </q-tabs>
+    </div>
 
-    <!-- Active Models Selection -->
-    <q-card flat bordered class="q-mb-md">
-      <q-card-section class="bg-orange-9 text-white row items-center">
-        <div class="text-h6">Production Control Center</div>
-        <q-space />
-        <div class="text-subtitle2">Select a model to assign workforce and set pricing</div>
-      </q-card-section>
+    <q-tab-panels v-model="viewTab" animated class="bg-transparent">
       
-      <q-card-section>
-        <div v-if="designStore.models.length === 0" class="text-center q-pa-lg text-grey">
-          You must design a vehicle in the Design Workshop before you can start production.
+      <!-- TAB 1: PRODUCTION CONTROL -->
+      <q-tab-panel name="production" class="q-pa-none">
+        <div v-if="playerStore.factories.length === 0" class="text-center q-pa-xl text-grey bg-white rounded-borders">
+          No factories built. Open one in the Global Expansion tab!
         </div>
-        <div v-else class="row q-gutter-md">
-          <q-btn
-            v-for="model in designStore.models"
-            :key="model.id"
-            :color="selectedModelId === model.id ? 'orange-9' : 'grey-7'"
-            :label="model.name"
-            @click="selectedModelId = model.id"
-            unelevated
-          />
-        </div>
-      </q-card-section>
-    </q-card>
+        <div v-else class="row q-col-gutter-md">
+          <div v-for="factory in playerStore.factories" :key="factory.id" class="col-12 col-md-6">
+            <q-card flat bordered>
+              <q-card-section class="bg-blue-grey-9 text-white row items-center">
+                <div class="text-h6">{{ factory.location }} ({{ formatTerritoryName(factory.territory) }})</div>
+                <q-space />
+                <q-badge :color="getLoadColor(factory)" class="text-weight-bold">
+                  Factory Load: {{ getFactoryAssigned(factory.id) }} / {{ factory.totalWorkers }} Workers
+                </q-badge>
+              </q-card-section>
 
-    <div v-if="selectedModel" class="row q-gutter-md">
-      <!-- Territory Management -->
-      <div v-for="territory in worldStore.territories" :key="territory.id" class="col-12 col-md-5">
-        <q-card flat bordered :class="territory.active ? 'bg-white' : 'bg-grey-3 opacity-50'">
-          <q-card-section :class="territory.active ? 'bg-blue-grey-8' : 'bg-grey-7'" class="text-white row items-center">
-            <div class="text-h6">{{ territory.name }}</div>
+              <q-card-section v-if="designStore.models.length === 0" class="text-center q-pa-md italic text-grey">
+                No designs available to build.
+              </q-card-section>
+              <q-list v-else separator>
+                <q-item v-for="model in designStore.models" :key="model.id" class="q-py-md">
+                  <q-item-section>
+                    <div class="row items-center justify-between q-mb-sm">
+                      <div class="text-subtitle1 text-weight-bold">{{ model.name }}</div>
+                      <div class="text-caption text-indigo-9">Est. Output: {{ calculateOutput(factory, model.id) }} Units/mo</div>
+                    </div>
+                    <div class="row items-center q-gutter-md">
+                      <q-slider
+                        :model-value="getAssignment(factory.id, model.id)"
+                        @update:model-value="(val) => setAssignment(factory.id, model.id, val)"
+                        :min="0"
+                        :max="factory.totalWorkers"
+                        :step="1"
+                        label
+                        color="orange-9"
+                        class="col"
+                      />
+                      <div class="text-h6 text-center" style="width: 60px">{{ getAssignment(factory.id, model.id) }}</div>
+                    </div>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-card>
+          </div>
+        </div>
+      </q-tab-panel>
+
+      <!-- TAB 2: REGIONAL DISTRIBUTION -->
+      <q-tab-panel name="distribution" class="q-pa-none">
+        <q-card flat bordered class="q-mb-md">
+          <q-card-section class="bg-orange-9 text-white row items-center">
+            <div class="text-h6">Logistics Strategy</div>
             <q-space />
-            <div v-if="territory.active" class="row items-center q-gutter-x-xs">
-              <q-badge color="indigo" :label="`Supplied by: ${getSupplyingFactoryName(territory.id)}`" />
-              <q-badge color="green" label="Active Market" />
-            </div>
-            <q-badge v-else color="grey" label="Locked" />
-          </q-card-section>
-
-          <q-card-section v-if="territory.active">
-            <div class="row q-col-gutter-md">
-              <!-- Workforce Assignment -->
-              <div class="col-12">
-                <div class="text-subtitle2 text-orange-9 q-mb-sm row justify-between">
-                  <span>Workforce Assignment</span>
-                  <q-badge :color="getWorkforceColor(territory.id)" class="text-weight-bold">
-                    Factory Workforce: {{ getUsedWorkforce(territory.id) }} / {{ getTotalWorkforce(territory.id) }} People
-                  </q-badge>
-                </div>
-                <div class="row items-center q-gutter-sm">
-                   <div class="col">
-                     <q-slider
-                       v-model="productionSettings[territory.id].assignedWorkers"
-                       :min="0"
-                       :max="getTotalWorkforce(territory.id)"
-                       :step="1"
-                       label
-                       color="orange-9"
-                     />
-                   </div>
-                   <div class="text-h6 text-center" style="width: 80px">
-                     {{ productionSettings[territory.id].assignedWorkers }}
-                     <div class="text-caption text-grey-7">Workers</div>
-                   </div>
-                </div>
-                
-                <div v-if="getUsedWorkforce(territory.id) > getTotalWorkforce(territory.id)" class="text-caption text-negative text-weight-bold">
-                  ⚠️ WARNING: Over-assigned! Workers will be split proportionally.
-                </div>
-
-                <div class="bg-blue-grey-1 q-pa-sm rounded-borders q-mt-sm row justify-between items-center">
-                   <span class="text-caption">Est. Monthly Output:</span>
-                   <span class="text-h6 text-indigo-9">{{ calculateEstOutput(territory.id) }} Units</span>
-                </div>
-              </div>
-
-              <!-- Pricing Settings -->
-              <div class="col-12">
-                <div class="text-subtitle2 text-green-9 q-mb-sm">Sales & Pricing</div>
-                <div class="row items-center q-gutter-sm">
-                   <q-input
-                     v-model.number="productionSettings[territory.id].price"
-                     type="number"
-                     prefix="$"
-                     label="Selling Price"
-                     outlined dense
-                     class="col"
-                   />
-                   <div class="col text-center">
-                     <div class="text-caption">Profit Margin</div>
-                     <q-badge :color="marginColor(territory.id)" class="text-h6">
-                       {{ marginPercent(territory.id) }}%
-                     </q-badge>
-                   </div>
-                </div>
-              </div>
-
-              <!-- Regional Inventory -->
-              <div class="col-12 q-mt-md bg-grey-1 q-pa-sm rounded-borders">
-                <div class="row justify-between items-center">
-                  <div class="text-caption font-weight-bold">Current Regional Inventory:</div>
-                  <div class="text-h6 text-blue-9">{{ playerStore.getInventory(selectedModel.id, territory.id) }} Units</div>
-                </div>
-              </div>
-            </div>
-          </q-card-section>
-
-          <q-card-section v-else class="text-center q-pa-xl">
-             <div class="text-grey">Market not yet unlocked.</div>
+            <q-select
+              v-model="selectedModelId"
+              :options="designStore.models"
+              option-label="name"
+              option-value="id"
+              emit-value
+              map-options
+              dense dark standout
+              label="Select Model"
+              style="min-width: 200px"
+            />
           </q-card-section>
         </q-card>
-      </div>
-    </div>
+
+        <div v-if="!selectedModelId" class="text-center q-pa-xl text-grey bg-white rounded-borders">
+          Select a vehicle model to configure regional supply priorities.
+        </div>
+        <div v-else class="row q-col-gutter-md">
+          <div v-for="territory in worldStore.territories.filter(t => t.active)" :key="territory.id" class="col-12 col-md-6">
+            <q-card flat bordered>
+              <q-card-section class="bg-blue-grey-2 row items-center">
+                <div class="text-h6 text-blue-grey-10">{{ territory.name }} Market</div>
+                <q-space />
+                <q-badge color="indigo-10" :label="`Stock: ${playerStore.getInventory(selectedModelId, territory.id)} Units`" />
+              </q-card-section>
+
+              <q-card-section>
+                <div class="row q-col-gutter-md items-center">
+                  <!-- Pricing -->
+                  <div class="col-12 col-sm-4">
+                    <div class="text-overline text-grey-7">Retail Price</div>
+                    <q-input
+                      :model-value="getPrice(territory.id)"
+                      @update:model-value="(val) => setPrice(territory.id, val)"
+                      type="number"
+                      prefix="$"
+                      outlined dense
+                    />
+                  </div>
+
+                  <!-- Source Priorities -->
+                  <div class="col-12 col-sm-8">
+                    <div class="text-overline text-grey-7">Supply Chain (Prioritized)</div>
+                    <div class="row q-col-gutter-xs">
+                      <div v-for="i in 3" :key="i" class="col-4">
+                        <q-select
+                          :model-value="getPriority(territory.id, i-1)"
+                          @update:model-value="(val) => setPriority(territory.id, i-1, val)"
+                          :options="factoryOptions"
+                          option-label="label"
+                          option-value="value"
+                          emit-value
+                          map-options
+                          dense outlined
+                          :label="'Pri ' + i"
+                          clearable
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="q-mt-md bg-grey-1 q-pa-sm rounded-borders text-caption">
+                  <q-icon name="info" color="grey-7" class="q-mr-xs" />
+                  Demand will be fulfilled locally first (if a local factory is Pri 1), then from the priority sources in order.
+                </div>
+              </q-card-section>
+            </q-card>
+          </div>
+        </div>
+      </q-tab-panel>
+
+    </q-tab-panels>
   </q-page>
 </template>
 
 <script setup>
-import { ref, computed, watch, reactive } from 'vue'
+import { ref, computed } from 'vue'
 import { useWorldStore } from '../stores/world'
 import { usePlayerStore } from '../stores/player'
 import { useDesignStore } from '../stores/design'
@@ -128,103 +150,61 @@ const worldStore = useWorldStore()
 const playerStore = usePlayerStore()
 const designStore = useDesignStore()
 
-const selectedModelId = ref(designStore.models.length > 0 ? designStore.models[0].id : null)
-const selectedModel = computed(() => designStore.models.find(m => m.id === selectedModelId.value))
+const viewTab = ref('production')
+const selectedModelId = ref(designStore.models[0]?.id || null)
 
-const productionSettings = reactive({})
+const factoryOptions = computed(() => {
+  return playerStore.factories.map(f => ({
+    label: f.location,
+    value: f.id
+  }))
+})
 
-watch(selectedModelId, (newId) => {
-  if (newId) {
-    worldStore.territories.forEach(t => {
-      const config = playerStore.getModelConfig(newId, t.id)
-      productionSettings[t.id] = {
-        assignedWorkers: config.assignedWorkers || 0,
-        price: config.price || Math.floor(selectedModel.value.cost * 1.5)
-      }
-    })
-  }
-}, { immediate: true })
-
-watch(productionSettings, (newSettings) => {
-  if (selectedModelId.value) {
-    Object.keys(newSettings).forEach(territoryId => {
-      playerStore.updateProductionConfig(
-        selectedModelId.value, 
-        territoryId, 
-        'assignedWorkers', 
-        newSettings[territoryId].assignedWorkers
-      )
-      playerStore.updateProductionConfig(
-        selectedModelId.value, 
-        territoryId, 
-        'price', 
-        newSettings[territoryId].price
-      )
-    })
-    playerStore.recalculateIdleWorkers()
-  }
-}, { deep: true })
-
-function marginPercent(territoryId) {
-  if (!selectedModel.value || !productionSettings[territoryId]?.price) return 0
-  const profit = productionSettings[territoryId].price - selectedModel.value.cost
-  return Math.floor((profit / (productionSettings[territoryId].price || 1)) * 100)
+function formatTerritoryName(id) {
+  return worldStore.territories.find(t => t.id === id)?.name || id
 }
 
-function marginColor(territoryId) {
-  const margin = marginPercent(territoryId)
-  if (margin < 0) return 'negative'
-  if (margin < 15) return 'warning'
-  return 'positive'
+// PRODUCTION HELPERS
+function getAssignment(fId, mId) {
+  return playerStore.factoryAssignments[fId]?.[mId] || 0
 }
 
-function getTotalWorkforce(territoryId) {
-  const factoryId = playerStore.supplyLines[territoryId]
-  const factory = playerStore.factories.find(f => f.id === factoryId)
-  return factory ? factory.totalWorkers : 0
+function setAssignment(fId, mId, val) {
+  playerStore.updateFactoryAssignment(fId, mId, parseInt(val) || 0)
 }
 
-function getUsedWorkforce(territoryId) {
-  const factoryId = playerStore.supplyLines[territoryId]
-  let total = 0
-  
-  // Find all territories supplied by THIS factory
-  const suppliedBySameFactory = Object.keys(playerStore.supplyLines).filter(tId => playerStore.supplyLines[tId] === factoryId)
-
-  designStore.models.forEach(model => {
-    suppliedBySameFactory.forEach(tId => {
-      if (model.id === selectedModelId.value && tId === territoryId) {
-        total += productionSettings[tId]?.assignedWorkers || 0
-      } else {
-        const config = playerStore.getModelConfig(model.id, tId)
-        total += config.assignedWorkers || 0
-      }
-    })
-  })
-  return total
+function getFactoryAssigned(fId) {
+  const assignments = playerStore.factoryAssignments[fId] || {}
+  return Object.values(assignments).reduce((a, b) => a + b, 0)
 }
 
-function getWorkforceColor(territoryId) {
-  const used = getUsedWorkforce(territoryId)
-  const total = getTotalWorkforce(territoryId)
-  if (used > total) return 'negative'
-  if (used > total * 0.9) return 'warning'
-  return 'blue-grey-8'
+function getLoadColor(f) {
+  const assigned = getFactoryAssigned(f.id)
+  if (assigned > f.totalWorkers) return 'negative'
+  if (assigned > f.totalWorkers * 0.9) return 'warning'
+  return 'white'
 }
 
-function calculateEstOutput(territoryId) {
-  const factoryId = playerStore.supplyLines[territoryId]
-  const factory = playerStore.factories.find(f => f.id === factoryId)
-  if (!factory) return 0
-  const workers = productionSettings[territoryId]?.assignedWorkers || 0
-  return Math.floor(workers * playerStore.getFactoryProductivity(factory.id))
+function calculateOutput(f, mId) {
+  const workers = getAssignment(f.id, mId)
+  return Math.floor(workers * playerStore.getFactoryProductivity(f.id))
 }
 
-function getSupplyingFactoryName(territoryId) {
-  const factoryId = playerStore.supplyLines[territoryId]
-  const factory = playerStore.factories.find(f => f.id === factoryId)
-  if (!factory) return 'None'
-  const territoryName = worldStore.territories.find(t => t.id === factory.territory)?.name || factory.territory
-  return `${factory.location} (${territoryName})`
+// DISTRIBUTION HELPERS
+function getPrice(tId) {
+  return playerStore.regionalDistribution[tId]?.[selectedModelId.value]?.price || 1000
+}
+
+function setPrice(tId, val) {
+  playerStore.updateRegionalPrice(tId, selectedModelId.value, parseInt(val) || 0)
+}
+
+function getPriority(tId, idx) {
+  const priorities = playerStore.regionalDistribution[tId]?.[selectedModelId.value]?.priorities || []
+  return priorities[idx] || null
+}
+
+function setPriority(tId, idx, fId) {
+  playerStore.updateRegionalPriority(tId, selectedModelId.value, idx, fId)
 }
 </script>

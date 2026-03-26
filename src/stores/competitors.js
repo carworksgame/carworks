@@ -1,4 +1,5 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
+import { useWorldStore } from './world'
 
 export const RIVAL_POOL = [
   {
@@ -62,14 +63,13 @@ export const RIVAL_POOL = [
 export const useCompetitorStore = defineStore('competitors', {
   state: () => ({
     competitors: [],
-    insolventMonths: {} // Tracks how many months a rival has been negative
+    insolventMonths: {} 
   }),
 
   persist: true,
 
   actions: {
     initializeRivals() {
-      // Pick 3 random rivals from the pool
       const shuffled = [...RIVAL_POOL].sort(() => 0.5 - Math.random())
       const selected = shuffled.slice(0, 3)
 
@@ -82,32 +82,25 @@ export const useCompetitorStore = defineStore('competitors', {
         reputation: 50,
         status: 'normal',
         unlockedTech: ['basic-chassis', 'single-cylinder', 'wood-brakes', 'tiller-steering', 'gas-lanterns'],
+        unlockedTerritories: [rival.homeTerritory],
+        regionalShowrooms: { [rival.homeTerritory]: 1 },
         models: JSON.parse(JSON.stringify(rival.startingModels)),
         marketShare: 0,
-        factories: [
-          { 
-            id: `ai-f-${rival.id}`, 
-            location: `${rival.name} HQ`, 
-            level: 1, 
-            employees: 150, 
-            productivity: 1.0, 
-            territory: rival.homeTerritory, 
-            salary: rival.homeTerritory === 'north-america' ? 50 : 40 
-          }
-        ],
+        factories: [{ 
+          id: `ai-f-${rival.id}`, location: `${rival.name} HQ`, 
+          level: 1, employees: 150, productivity: 1.0, 
+          territory: rival.homeTerritory, salary: 50 
+        }],
         researchInvestment: 500,
         regionalInventory: {},
         lastTurnLedger: { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0, net: 0 }
       }))
-      
       this.insolventMonths = {}
     },
 
     spawnNewRival(year) {
-      // Find a rival not currently active
       const activeIds = this.competitors.map(c => c.id)
       const available = RIVAL_POOL.filter(r => !activeIds.includes(r.id))
-      
       if (available.length > 0) {
         const rival = available[Math.floor(Math.random() * available.length)]
         const newRival = {
@@ -119,13 +112,11 @@ export const useCompetitorStore = defineStore('competitors', {
           reputation: 40,
           status: 'normal',
           unlockedTech: ['improved-v8', 'all-steel-ladder', 'hydraulic-brakes', 'shock-absorbers', 'enclosed-cabin'],
+          unlockedTerritories: [rival.homeTerritory],
+          regionalShowrooms: { [rival.homeTerritory]: 2 },
           models: JSON.parse(JSON.stringify(rival.startingModels)),
           marketShare: 0,
-          factories: [{ 
-            id: `ai-f-${rival.id}`, location: `${rival.name} Expansion`, 
-            level: 2, employees: 200, productivity: 1.2, 
-            territory: rival.homeTerritory, salary: 150 
-          }],
+          factories: [{ id: `ai-f-${rival.id}`, location: `${rival.name} Base`, level: 2, employees: 200, productivity: 1.2, territory: rival.homeTerritory, salary: 150 }],
           researchInvestment: 1000,
           regionalInventory: {},
           lastTurnLedger: { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0, net: 0 }
@@ -144,20 +135,15 @@ export const useCompetitorStore = defineStore('competitors', {
         const researchChance = comp.personality.research === 'High' ? 0.3 : 0.1
         if (Math.random() < researchChance) {
           const available = techPool.filter(t => !comp.unlockedTech.includes(t.id))
-          if (available.length > 0) {
-            comp.unlockedTech.push(available[Math.floor(Math.random() * available.length)].id)
-          }
+          if (available.length > 0) comp.unlockedTech.push(available[Math.floor(Math.random() * available.length)].id)
         }
 
         // 2. Model Evolution
         if (Math.random() > 0.96) {
            const baseModel = comp.models[0]
            const newModel = {
-             ...baseModel,
-             id: `${baseModel.id}-${Date.now()}`,
-             name: `${baseModel.name} ${year}`,
-             price: Math.floor(baseModel.price * 1.08),
-             cost: Math.floor(baseModel.cost * 1.04),
+             ...baseModel, id: `${baseModel.id}-${Date.now()}`, name: `${baseModel.name} ${year}`,
+             price: Math.floor(baseModel.price * 1.08), cost: Math.floor(baseModel.cost * 1.04),
              stats: { ...baseModel.stats, power: baseModel.stats.power + 5, economy: baseModel.stats.economy + 1 }
            }
            comp.models.unshift(newModel)
@@ -166,11 +152,42 @@ export const useCompetitorStore = defineStore('competitors', {
 
         // 3. Worker Management
         if (comp.funds > 20000 && Math.random() > 0.8) {
-          comp.factories.forEach(f => {
-            f.employees = Math.min(1000, Math.floor(f.employees * 1.05))
-          })
+          comp.factories.forEach(f => { f.employees = Math.min(1000, Math.floor(f.employees * 1.05)) })
         }
+
+        // 4. Global Expansion & Showrooms
+        this.processAIEconomics(comp)
       })
+    },
+
+    processAIEconomics(comp) {
+      const worldStore = useWorldStore()
+      
+      // Expansion Chance
+      if (comp.funds > 100000 && Math.random() > 0.95) {
+        const available = worldStore.territories.filter(t => !comp.unlockedTerritories.includes(t.id))
+        if (available.length > 0) {
+          const target = available[Math.floor(Math.random() * available.length)]
+          if (comp.funds >= target.unlockCost) {
+            comp.funds -= target.unlockCost
+            comp.unlockedTerritories.push(target.id)
+            comp.regionalShowrooms[target.id] = 1
+          }
+        }
+      }
+
+      // Showroom Chance (Build presence in existing territories)
+      if (comp.funds > 30000 && Math.random() > 0.9) {
+        const tId = comp.unlockedTerritories[Math.floor(Math.random() * comp.unlockedTerritories.length)]
+        const current = comp.regionalShowrooms[tId] || 0
+        if (current < 5) {
+          const cost = Math.round(10000 * worldStore.inflationMultiplier)
+          if (comp.funds >= cost) {
+            comp.funds -= cost
+            comp.regionalShowrooms[tId] = current + 1
+          }
+        }
+      }
     },
 
     addToInventory(compId, modelId, territoryId, count) {
@@ -193,17 +210,21 @@ export const useCompetitorStore = defineStore('competitors', {
     processMonthlyFinances(compDataMap) {
       this.competitors.forEach(comp => {
         const data = compDataMap[comp.id] || { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0 }
-        const totalExpenses = data.productionCosts + (data.shipping || 0) + (data.salaries || 0) + (data.maintenance || 0) + (data.lease || 0) + (data.research || 0)
+        
+        // Showroom lease costs for AI
+        const totalShowrooms = Object.values(comp.regionalShowrooms).reduce((a, b) => a + b, 0)
+        const leaseCost = (data.lease || 0) + (totalShowrooms * 500)
+
+        const totalExpenses = data.productionCosts + (data.shipping || 0) + (data.salaries || 0) + (data.maintenance || 0) + leaseCost + (data.research || 0)
         const net = data.income - totalExpenses
         comp.funds += net
         
         comp.lastTurnLedger = { 
           income: data.income, productionCosts: data.productionCosts, shipping: data.shipping || 0,
-          salaries: data.salaries || 0, maintenance: data.maintenance || 0, lease: data.lease || 0,
+          salaries: data.salaries || 0, maintenance: data.maintenance || 0, lease: leaseCost,
           research: data.research || 0, net 
         }
 
-        // Bankruptcy tracking
         if (comp.funds < 0) {
           this.insolventMonths[comp.id] = (this.insolventMonths[comp.id] || 0) + 1
           if (this.insolventMonths[comp.id] >= 3) comp.status = 'distressed'
@@ -214,9 +235,7 @@ export const useCompetitorStore = defineStore('competitors', {
       })
     },
 
-    updateMarketShare(shares) {
-      this.competitors.forEach(comp => { comp.marketShare = shares[comp.id] || 0 })
-    },
+    updateMarketShare(shares) { this.competitors.forEach(comp => { comp.marketShare = shares[comp.id] || 0 }) },
 
     removeCompetitor(id) {
       this.competitors = this.competitors.filter(c => c.id !== id)
