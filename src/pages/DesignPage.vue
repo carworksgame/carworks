@@ -107,7 +107,7 @@
               <div class="text-subtitle2 q-mb-sm">Target Ratings</div>
               <div class="q-mb-xs">
                 <div class="row justify-between text-caption"><span>Power-to-Weight</span><span>{{ pwrRatio.toFixed(1) }}</span></div>
-                <q-linear-progress :value="pwrRatio / 20" color="teal" />
+                <q-linear-progress :value="pwrRatio / 150" color="teal" />
               </div>
               <div class="q-mb-xs">
                 <div class="row justify-between text-caption"><span>Fuel Economy</span><span>{{ stats.economy }} MPG</span></div>
@@ -203,9 +203,9 @@
 
     <!-- Existing Models -->
     <div class="text-h5 q-mt-xl q-mb-md">Current Production Models</div>
-    <div v-if="designStore.models.length === 0" class="text-grey italic">No models designed yet.</div>
+    <div v-if="designStore.activeModels.length === 0" class="text-grey italic">No active models in production.</div>
     <div class="row q-gutter-md">
-       <q-card v-for="model in designStore.models" :key="model.id" flat bordered class="col-12 col-sm-3">
+       <q-card v-for="model in designStore.activeModels" :key="model.id" flat bordered class="col-12 col-sm-3">
          <q-card-section class="bg-teal-1">
            <div class="row justify-between no-wrap">
              <div class="text-h6 ellipsis">{{ model.name }}</div>
@@ -234,7 +234,27 @@
              <span>{{ model.stats.realAcceleration?.toFixed(1) }}s</span>
            </div>
          </q-card-section>
+         <q-separator />
+         <q-card-actions align="center">
+           <q-btn flat color="grey-7" icon="archive" label="Archive Design" size="sm" @click="confirmArchive(model)" />
+         </q-card-actions>
        </q-card>
+    </div>
+
+    <!-- Archived Models -->
+    <div v-if="designStore.models.some(m => m.archived)" class="q-mt-xl">
+      <div class="text-h5 q-mb-md text-grey-7">Historical Archive</div>
+      <div class="row q-gutter-md">
+        <q-card v-for="model in designStore.models.filter(m => m.archived)" :key="model.id" flat bordered class="col-12 col-sm-2 bg-grey-2 opacity-70">
+          <q-card-section class="bg-grey-4">
+            <div class="text-subtitle1 ellipsis text-grey-9">{{ model.name }}</div>
+            <div class="text-caption">Retired: {{ gameStore.year }}</div>
+          </q-card-section>
+          <q-card-actions align="center">
+            <q-btn flat color="blue-grey" icon="unarchive" label="Restore" size="sm" @click="designStore.restoreModel(model.id)" />
+          </q-card-actions>
+        </q-card>
+      </div>
     </div>
   </q-page>
 </template>
@@ -243,13 +263,13 @@
 import { reactive, computed, watch } from 'vue'
 import { useDesignStore, VEHICLE_CLASSES } from '../stores/design'
 import { useResearchStore } from '../stores/research'
-import { usePlayerStore } from '../stores/player'
+import { useGameStore } from '../stores/game'
 import { useQuasar } from 'quasar'
 import VehicleBlueprint from 'components/VehicleBlueprint.vue'
 
 const designStore = useDesignStore()
 const researchStore = useResearchStore()
-const playerStore = usePlayerStore()
+const gameStore = useGameStore()
 const $q = useQuasar()
 
 const unlockedComponents = computed(() => designStore.getUnlockedComponents(researchStore.unlockedTech))
@@ -327,11 +347,12 @@ function formatResult(id, val) {
 }
 
 function startPrototype() {
-  if (!currentDesign.name) {
-    $q.notify({ color: 'negative', message: 'Please enter a model name.' })
+  if (!currentDesign.name || !currentDesign.chassis || !currentDesign.engine || !currentDesign.steering || !currentDesign.brakes) {
+    $q.notify({ color: 'negative', message: 'Please complete the base design (Chassis, Engine, Steering, Brakes).' })
     return
   }
-  designStore.startPrototype({
+  
+  const prototype = {
     name: currentDesign.name,
     vehicleClass: currentDesign.vehicleClass,
     cost: totalCost.value,
@@ -344,6 +365,20 @@ function startPrototype() {
       brakes: currentDesign.brakes.id,
       features: currentDesign.features.map(f => f.id)
     }
+  }
+  
+  designStore.startPrototype(prototype)
+}
+
+function confirmArchive(model) {
+  $q.dialog({
+    title: 'Archive Design',
+    message: `Stop production of ${model.name} and move it to the historical archive?`,
+    cancel: true,
+    persistent: true
+  }).onOk(() => {
+    designStore.archiveModel(model.id)
+    $q.notify({ color: 'info', message: `${model.name} archived.`, icon: 'archive' })
   })
 }
 
@@ -377,9 +412,5 @@ function finalizePrototype() {
     designStore.finalizePrototype()
     $q.notify({ color: 'positive', message: 'Model released to production!' })
   }
-}
-
-function formatTechName(id) {
-  return id.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
 }
 </script>

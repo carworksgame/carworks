@@ -484,10 +484,29 @@
 
       <!-- SIM ANALYTICS PANEL -->
       <q-tab-panel v-if="debugStore.debugMode" name="debug" class="q-pa-none">
-        <div v-if="!debugStore.lastTurnSnapshot" class="text-center q-pa-xl text-grey">Run a turn with Developer Mode active to capture simulation math.</div>
-        <div v-else class="row q-gutter-md">
-          <q-card flat bordered class="col-12"><q-card-section class="bg-grey-8 text-white"><div class="text-h6">World Context</div></q-card-section><q-card-section><div class="text-subtitle1 q-mb-md">Economic Climate: <span class="text-weight-bold">{{ worldStore.economicClimate.toFixed(2) }}x</span></div><div class="text-subtitle2 q-mb-sm text-grey-8">Current Global Demand Segments:</div><q-list dense class="bg-grey-1 rounded-borders q-pa-sm" style="max-width: 400px"><q-item v-for="(share, cls) in currentMarketSegments" :key="cls" class="q-py-xs"><q-item-section><div class="row items-center"><span class="text-weight-bold" style="width: 80px">{{ cls }}</span><q-linear-progress :value="share" color="brown-5" class="col q-mx-sm" size="8px" /><span class="text-caption" style="width: 40px">{{ Math.round(share * 100) }}%</span></div></q-item-section></q-item></q-list></q-card-section></q-card>
-          <q-card flat bordered class="col-12">
+        <div class="row q-gutter-md">
+          <!-- NEWS DEBUG CONTROLS -->
+          <q-card flat bordered class="col-12 bg-red-1">
+            <q-card-section class="bg-red-9 text-white row items-center">
+              <div class="text-h6">Debug News Controls</div>
+              <q-space />
+              <q-icon name="campaign" size="sm" />
+            </q-card-section>
+            <q-card-section class="row q-col-gutter-md items-center">
+              <div class="col-12 col-md-4">
+                <q-input v-model="headlineText" outlined dense label="Custom Headline" bg-color="white" />
+              </div>
+              <div class="col-12 col-md-8 q-gutter-sm">
+                <q-btn color="red-9" label="Trigger Headline" @click="gameStore.triggerNews(headlineText)" />
+                <q-btn color="black" label="Trigger Crisis" @click="gameStore.triggerNews('STOCK MARKET CRASH!', 'The global economy has entered a severe depression. Luxury and Sport sales are expected to evaporate.', 'crisis')" />
+                <q-btn color="green-9" label="Trigger Recovery" @click="gameStore.triggerNews('THE BOOM RETURNS!', 'Economic indicators suggest a new era of prosperity is beginning.', 'recovery')" />
+                <q-btn color="indigo-9" label="Trigger Rival" @click="competitorStore.spawnNewRival()" />
+              </div>
+            </q-card-section>
+          </q-card>
+
+          <q-card v-if="!debugStore.lastTurnSnapshot" flat bordered class="col-12"><q-card-section class="bg-grey-8 text-white"><div class="text-h6">World Context</div></q-card-section><q-card-section><div class="text-subtitle1 q-mb-md">Economic Climate: <span class="text-weight-bold">{{ worldStore.economicClimate.toFixed(2) }}x</span></div><div class="text-subtitle2 q-mb-sm text-grey-8">Current Global Demand Segments:</div><q-list dense class="bg-grey-1 rounded-borders q-pa-sm" style="max-width: 400px"><q-item v-for="(share, cls) in currentMarketSegments" :key="cls" class="q-py-xs"><q-item-section><div class="row items-center"><span class="text-weight-bold" style="width: 80px">{{ cls }}</span><q-linear-progress :value="share" color="brown-5" class="col q-mx-sm" size="8px" /><span class="text-caption" style="width: 40px">{{ Math.round(share * 100) }}%</span></div></q-item-section></q-item></q-list></q-card-section></q-card>
+          <q-card flat bordered class="col-12" v-if="debugStore.lastTurnSnapshot">
             <q-card-section class="bg-indigo-10 text-white"><div class="text-h6">Rival Company Financials (Last Turn)</div></q-card-section>
             <q-card-section><div class="row q-col-gutter-md"><div v-for="comp in competitorStore.competitors" :key="comp.id" class="col-12 col-md-4"><q-card flat bordered class="bg-indigo-1"><q-card-section class="q-pb-none"><div class="text-subtitle1 text-weight-bold">{{ comp.name }}</div><div class="text-caption">Total Cash: ${{ comp.funds.toLocaleString() }}</div></q-card-section><q-card-section><q-list dense><q-item><q-item-section>Income:</q-item-section><q-item-section side class="text-green-9 text-weight-bold">+${{ comp.lastTurnLedger.income.toLocaleString() }}</q-item-section></q-item><q-item-label header class="q-pt-sm text-indigo-9 text-overline">Expenses</q-item-label><q-item><q-item-section>Production:</q-item-section><q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.productionCosts.toLocaleString() }}</q-item-section></q-item><q-item><q-item-section>Salaries:</q-item-section><q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.salaries.toLocaleString() }}</q-item-section></q-item><q-item><q-item-section>Shipping:</q-item-section><q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.shipping.toLocaleString() }}</q-item-section></q-item><q-item><q-item-section>Maint/Lease:</q-item-section><q-item-section side class="text-red-9">-${{ (comp.lastTurnLedger.maintenance + comp.lastTurnLedger.lease).toLocaleString() }}</q-item-section></q-item><q-item><q-item-section>Research:</q-item-section><q-item-section side class="text-red-9">-${{ comp.lastTurnLedger.research.toLocaleString() }}</q-item-section></q-item><q-separator class="q-my-xs" /><q-item class="text-weight-bold"><q-item-section>Net:</q-item-section><q-item-section side :class="comp.lastTurnLedger.net >= 0 ? 'text-green-9' : 'text-red-9'">${{ comp.lastTurnLedger.net.toLocaleString() }}</q-item-section></q-item></q-list></q-card-section></q-card></div></div></q-card-section>
           </q-card>
@@ -543,7 +562,7 @@ import { useSavesStore } from '../stores/saves'
 import { useDebugStore } from '../stores/debug'
 import { useReportsStore } from '../stores/reports'
 import { useResearchStore } from '../stores/research'
-import { getMarketSegments, getBaseMarketPrice } from '../logic/simulation'
+import { getMarketSegments } from '../logic/simulation'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { VEHICLE_CLASSES } from '../stores/design'
@@ -568,6 +587,7 @@ const showFactoryDialog = ref(false)
 const selectedTerritory = ref(null)
 const factoryLocationName = ref('')
 const selectedResearchId = ref(null)
+const headlineText = ref('BREAKING: New Innovation Discovered!')
 
 const techHiringInput = ref(0)
 const factoryHiringInputs = ref({})
@@ -578,12 +598,6 @@ const playerShare = computed(() => {
 })
 
 const currentMarketSegments = computed(() => getMarketSegments(gameStore.year))
-
-const factoryOptions = computed(() => playerStore.factories.map(f => ({
-  label: `${f.location} (${formatTerritoryName(f.territory)})`,
-  value: f.id,
-  territory: f.territory
-})))
 
 const currentReportTitle = computed(() => {
   const titles = {
@@ -775,9 +789,44 @@ function handleAcquisition(comp) {
   $q.dialog({ title: 'Acquire Rival', message: `Acquire ${comp.name} for $${price.toLocaleString()}?`, cancel: true, persistent: true }).onOk(() => {
     if (playerStore.funds >= price) {
       playerStore.funds -= price
-      comp.factories.forEach(f => { playerStore.factories.push({ ...f, id: Date.now() + Math.random(), totalWorkers: f.employees, idleWorkers: f.employees, location: `${comp.name} - ${f.location}` }) })
+      
+      // Absorb Factories
+      comp.factories.forEach((f, idx) => { 
+        const newFactoryId = Date.now() + idx + Math.random()
+        playerStore.factories.push({ 
+          ...f, 
+          id: newFactoryId, 
+          totalWorkers: f.employees, 
+          idleWorkers: f.employees, 
+          location: `${comp.name} - ${f.location}` 
+        }) 
+
+        // Initialize assignments object
+        playerStore.factoryAssignments[newFactoryId] = {}
+
+        // Auto-assign production for the player's primary model if one exists
+        if (designStore.models.length > 0) {
+          const mainModel = designStore.models[0]
+          playerStore.updateFactoryAssignment(newFactoryId, mainModel.id, f.employees)
+          
+          // Set as primary supplier for its own territory
+          playerStore.updateRegionalPriority(f.territory, mainModel.id, 0, newFactoryId)
+        }
+      })
+      
+      // Absorb Tech
       comp.unlockedTech.forEach(tId => { if (!researchStore.unlockedTech.includes(tId)) researchStore.unlockedTech.push(tId) })
-      competitorStore.removeCompetitor(comp.id); $q.notify({ color: 'positive', message: 'Assets absorbed!', icon: 'handshake' })
+      
+      // Absorb Territories & Showrooms
+      comp.unlockedTerritories.forEach(tId => {
+        worldStore.unlockTerritory(tId)
+        const rivalShowrooms = comp.regionalShowrooms[tId] || 0
+        const playerShowrooms = playerStore.regionalShowrooms[tId] || 0
+        playerStore.regionalShowrooms[tId] = Math.min(10, playerShowrooms + rivalShowrooms)
+      })
+
+      competitorStore.removeCompetitor(comp.id)
+      $q.notify({ color: 'positive', message: 'Assets absorbed!', icon: 'handshake' })
     } else { $q.notify({ color: 'negative', message: 'Insufficient funds.' }) }
   })
 }

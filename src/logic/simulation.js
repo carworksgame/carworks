@@ -5,7 +5,6 @@ import { useResearchStore } from '../stores/research'
 import { useDesignStore, VEHICLE_CLASSES } from '../stores/design'
 import { useMarketingStore } from '../stores/marketing'
 import { useCompetitorStore } from '../stores/competitors'
-import { useSavesStore } from '../stores/saves'
 import { useBankStore } from '../stores/bank'
 import { useDebugStore } from '../stores/debug'
 import { useReportsStore } from '../stores/reports'
@@ -27,7 +26,7 @@ export function getBaseMarketPrice(year) {
   return 25000
 }
 
-export function processEndTurn() {
+export function processEndTurn(savesStore) {
   const gameStore = useGameStore()
   const playerStore = usePlayerStore()
   const worldStore = useWorldStore()
@@ -35,7 +34,6 @@ export function processEndTurn() {
   const designStore = useDesignStore()
   const marketingStore = useMarketingStore()
   const competitorStore = useCompetitorStore()
-  const savesStore = useSavesStore()
   const bankStore = useBankStore()
   const debugStore = useDebugStore()
   const reportsStore = useReportsStore()
@@ -69,7 +67,7 @@ export function processEndTurn() {
   // Emergent Rivals
   let emergentEvent = null
   if (gameStore.turnCount > 0 && gameStore.turnCount % 300 === 0 && competitorStore.competitors.length < 4) {
-    const newRival = competitorStore.spawnNewRival(gameStore.year)
+    const newRival = competitorStore.spawnNewRival()
     if (newRival) emergentEvent = { title: 'NEW COMPETITOR!', description: `${newRival.name} has been founded!`, type: 'competition' }
   }
 
@@ -91,19 +89,28 @@ export function processEndTurn() {
     const assignments = playerStore.factoryAssignments[f.id] || {}
     factoryModelPools[f.id] = {}
     
+    let factoryTotalOutput = 0
     Object.keys(assignments).forEach(mId => {
       const workers = assignments[mId]
       const model = designStore.models.find(m => m.id == mId)
-      if (workers > 0 && model) {
+      if (workers > 0 && model && !model.archived) {
         const output = Math.floor(workers * productivity)
         factoryModelPools[f.id][mId] = output
         const unitCostDiscount = 1 - ((f.level - 1) * 0.05)
         const finalUnitCost = Math.round(model.cost * worldStore.inflationMultiplier * unitCostDiscount)
         totalProductionCosts += output * finalUnitCost
         companyStats.player.production += output
+        factoryTotalOutput += output
+
+        // Initialize Model Report with "Built" in the territory where the factory is located
+        const mName = model.name
+        const tName = worldStore.territories.find(t => t.id === f.territory).name
+        if (!lastTurnData.modelReport[mName]) lastTurnData.modelReport[mName] = {}
+        if (!lastTurnData.modelReport[mName][tName]) lastTurnData.modelReport[mName][tName] = { built: 0, sold: 0, stock: 0 }
+        lastTurnData.modelReport[mName][tName].built += output
       }
     })
-    turnSnapshot.production[f.id] = { owner: 'Player', location: f.location, capacity: f.totalWorkers * productivity, actualOutput: companyStats.player.production }
+    turnSnapshot.production[f.id] = { owner: 'Player', location: f.location, capacity: f.totalWorkers * productivity, actualOutput: factoryTotalOutput }
   })
 
   // AI Production & Logistics
@@ -148,17 +155,15 @@ export function processEndTurn() {
     Object.keys(segments).forEach(segmentClass => {
       const segmentShare = segments[segmentClass]
       const segmentDemandBase = territoryDemandBase * segmentShare
-      designStore.models.forEach(m => {
+      designStore.activeModels.forEach(m => {
         if (m.vehicleClass !== segmentClass) return
         const dist = playerStore.regionalDistribution[territory.id]?.[m.id]
         if (!dist || dist.price <= 0) return
         let classMultiplier = 2.0
         let maxPriceFactor = m.vehicleClass === VEHICLE_CLASSES.LUXURY ? 5.0 : 2.0
         const affordabilityCap = baseMarketPrice * maxPriceFactor
-        let stickerShock = 1.0
         if (dist.price > affordabilityCap) {
-          stickerShock = Math.pow(0.1, (dist.price / (affordabilityCap || 1)) * 2)
-          if (isNaN(stickerShock)) stickerShock = 0.0001
+          const stickerShock = Math.max(0.0001, Math.pow(0.1, (dist.price / (affordabilityCap || 1)) * 2))
           classMultiplier *= stickerShock
         }
         const modelBoost = marketingStore.getBoostForModel(m.id, territory.id)
@@ -191,19 +196,20 @@ export function processEndTurn() {
       const shareOfPool = totalDemandInPass > 0 ? (c.demand / totalDemandInPass) : 0
       const amountToMove = Math.floor(Math.min(pool * shareOfPool, c.demand))
       if (amountToMove > 0) {
-        factoryModelPools[c.fId][mId] -= amountToMove; playerStore.addToInventory(mId, c.tId, amountToMove)
+        factoryModelPools[c.fId][mId] -= amountToMove
+        playerStore.addToInventory(mId, c.tId, amountToMove)
+        regionalModelDemand[c.tId][mId] -= amountToMove
         const factory = playerStore.factories.find(f => f.id == c.fId)
         totalShippingCosts += amountToMove * worldStore.getShippingCost(factory.territory, c.tId)
         const mName = designStore.models.find(m => m.id == mId).name
-        if (!lastTurnData.modelReport[mName]) lastTurnData.modelReport[mName] = {}
         const tName = worldStore.territories.find(t => t.id === c.tId).name
+        if (!lastTurnData.modelReport[mName]) lastTurnData.modelReport[mName] = {}
         if (!lastTurnData.modelReport[mName][tName]) lastTurnData.modelReport[mName][tName] = { built: 0, sold: 0, stock: 0 }
-        lastTurnData.modelReport[mName][tName].built += amountToMove
       }
     })
   }
 
-  designStore.models.forEach(model => {
+  designStore.activeModels.forEach(model => {
     distributeModel(model.id, (tId, mId) => {
       const pri1 = playerStore.regionalDistribution[tId]?.[mId]?.priorities[0]
       const factory = playerStore.factories.find(f => f.id == pri1)
@@ -212,6 +218,15 @@ export function processEndTurn() {
     distributeModel(model.id, (tId, mId) => playerStore.regionalDistribution[tId]?.[mId]?.priorities[0])
     distributeModel(model.id, (tId, mId) => playerStore.regionalDistribution[tId]?.[mId]?.priorities[1])
     distributeModel(model.id, (tId, mId) => playerStore.regionalDistribution[tId]?.[mId]?.priorities[2])
+
+    // SURPLUS HANDLING: Add remaining production to the factory's local territory inventory
+    playerStore.factories.forEach(f => {
+      const surplus = factoryModelPools[f.id]?.[model.id] || 0
+      if (surplus > 0) {
+        playerStore.addToInventory(model.id, f.territory, surplus)
+        factoryModelPools[f.id][model.id] = 0
+      }
+    })
   })
 
   // 5. SALES EXECUTION
@@ -229,7 +244,7 @@ export function processEndTurn() {
       if (!lastTurnData.modelComparison[territory.name]) lastTurnData.modelComparison[territory.name] = {}
       lastTurnData.modelComparison[territory.name][segmentClass] = []
 
-      designStore.models.forEach(m => {
+      designStore.activeModels.forEach(m => {
         const inventory = playerStore.inventory[m.id]?.[territory.id] || 0
         const config = playerStore.regionalDistribution[territory.id]?.[m.id]
         if (inventory > 0 && config && config.price > 0) {
@@ -353,6 +368,7 @@ export function processEndTurn() {
   gameStore.nextTurn()
   playerStore.clearReports(); playerStore.recalculateIdleWorkers()
   debugStore.setSnapshot(turnSnapshot)
+  
   if (gameStore.currentSlotId) savesStore.saveGame(gameStore.currentSlotId, playerStore.companyName)
 
   let gameStatus = 'normal'

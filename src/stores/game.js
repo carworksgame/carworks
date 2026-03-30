@@ -17,6 +17,13 @@ export const useGameStore = defineStore('game', {
     dateString: (state) => {
       const date = new Date(state.year, state.month)
       return date.toLocaleString('default', { month: 'long', year: 'numeric' })
+    },
+    newsImage: (state) => {
+      if (state.year < 1920) return 'newspaper.png'
+      if (state.year < 1950) return 'radio.png'
+      if (state.year < 1980) return 'TV1950.png'
+      if (state.year < 1990) return 'TV1980.png'
+      return 'TV1990.png'
     }
   },
 
@@ -35,6 +42,9 @@ export const useGameStore = defineStore('game', {
     setNews(event) {
       this.lastNewsEvent = event
       this.newsLog.unshift({ ...event, date: this.dateString })
+    },
+    triggerNews(title = 'TEST HEADLINE', description = 'This is a test of the emergency broadcast system.', type = 'info') {
+      this.setNews({ title, description, type })
     },
     resetGame() {
       this.year = 1908

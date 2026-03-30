@@ -136,29 +136,51 @@
 
     <!-- News Flash Dialog -->
     <q-dialog v-model="showNewsDialog">
-      <q-card style="min-width: 350px">
-        <q-card-section class="bg-orange-10 text-white row items-center">
-          <div class="text-h6">NEWS FLASH!</div>
+      <q-card style="min-width: 450px" class="bg-grey-1">
+        <q-card-section class="bg-orange-10 text-white row items-center q-py-sm">
+          <div class="text-h6 text-uppercase text-weight-bolder letter-spacing-1">News Flash</div>
           <q-space />
-          <q-icon name="newspaper" size="md" />
+          <q-icon :name="newsIcon" size="sm" />
         </q-card-section>
 
-        <q-card-section class="q-pa-xl text-center">
-          <div class="text-h4 text-weight-bold q-mb-md">{{ gameStore.lastNewsEvent?.title }}</div>
-          <div class="text-subtitle1 text-grey-8">{{ gameStore.dateString }}</div>
+        <q-card-section class="text-center q-pa-none bg-white">
+          <q-img 
+            :src="getNewsImage(gameStore.newsImage)" 
+            style="max-height: 250px" 
+            fit="contain"
+            class="q-ma-md"
+          >
+            <template v-slot:error>
+              <div class="absolute-full flex flex-center bg-grey-3 text-grey-7">
+                <q-icon :name="newsIcon" size="100px" />
+              </div>
+            </template>
+          </q-img>
         </q-card-section>
 
-        <q-card-section class="bg-grey-2">
-           <p v-if="gameStore.lastNewsEvent?.type === 'crisis'" class="text-negative text-weight-bold">
-             Market analysis: This event is expected to significantly reduce global car demand.
-           </p>
-           <p v-else class="text-positive text-weight-bold">
-             Market analysis: This event marks a period of recovery and economic growth.
-           </p>
+        <q-card-section class="q-pa-lg text-center bg-white border-top-grey">
+          <div class="text-h4 text-weight-bolder q-mb-xs text-brown-10">{{ gameStore.lastNewsEvent?.title }}</div>
+          <div class="text-subtitle2 text-grey-6 q-mb-md">{{ gameStore.dateString }}</div>
+          <q-separator class="q-my-md" />
+          <div class="text-body1 text-grey-9 q-px-md">{{ gameStore.lastNewsEvent?.description }}</div>
         </q-card-section>
 
-        <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+        <q-card-section v-if="gameStore.lastNewsEvent?.type === 'crisis' || gameStore.lastNewsEvent?.type === 'recovery'" class="bg-orange-1 q-pa-md">
+           <div class="row no-wrap items-center">
+             <q-icon :name="gameStore.lastNewsEvent?.type === 'crisis' ? 'trending_down' : 'trending_up'" :color="gameStore.lastNewsEvent?.type === 'crisis' ? 'negative' : 'positive'" size="md" class="q-mr-md" />
+             <div class="text-caption text-weight-medium">
+               <span v-if="gameStore.lastNewsEvent?.type === 'crisis'" class="text-negative">
+                 MARKET CRISIS: Global demand for automobiles has significantly dropped.
+               </span>
+               <span v-else class="text-positive">
+                 MARKET RECOVERY: Consumer confidence is returning; demand is on the rise.
+               </span>
+             </div>
+           </div>
+        </q-card-section>
+
+        <q-card-actions align="center" class="bg-white q-pb-md">
+          <q-btn unelevated label="Understood" color="orange-10" class="q-px-xl" v-close-popup />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -249,7 +271,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useGameStore } from '../stores/game'
 import { usePlayerStore } from '../stores/player'
 import { useWorldStore } from '../stores/world'
@@ -301,10 +323,27 @@ const nextMonthString = computed(() => {
   return date.toLocaleString('default', { month: 'long', year: 'numeric' })
 })
 
+const newsIcon = computed(() => {
+  if (gameStore.year < 1920) return 'newspaper'
+  if (gameStore.year < 1950) return 'radio'
+  return 'tv'
+})
+
+function getNewsImage(name) {
+  if (!name) return ''
+  return new URL(`../assets/images/${name}`, import.meta.url).href
+}
+
+watch(() => gameStore.lastNewsEvent, (newVal) => {
+  if (newVal) {
+    showNewsDialog.value = true
+  }
+})
+
 async function handleEndTurn () {
   isProcessingTurn.value = true
   await new Promise(resolve => setTimeout(resolve, 1500))
-  const { newsEvent, gameStatus } = processEndTurn()
+  const { newsEvent, gameStatus } = processEndTurn(savesStore)
   await new Promise(resolve => setTimeout(resolve, 500))
   isProcessingTurn.value = false
   

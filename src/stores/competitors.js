@@ -7,56 +7,56 @@ export const RIVAL_POOL = [
     name: 'Blue Oval Motors',
     homeTerritory: 'north-america',
     personality: { segment: 'Economy', expansion: 'Aggressive', research: 'Balanced' },
-    startingModels: [{ id: 'blue-oval-t', name: 'Model T-Rival', price: 850, cost: 400, stats: { pwrRatio: 2, safety: 5, power: 10, economy: 15 } }]
+    startingModels: [{ id: 'blue-oval-t', name: 'Model T-Rival', price: 850, cost: 400, stats: { pwrRatio: 13, safety: 5, power: 20, economy: 15 } }]
   },
   {
     id: 'general-auto',
     name: 'General Auto',
     homeTerritory: 'north-america',
     personality: { segment: 'Balanced', expansion: 'Moderate', research: 'High' },
-    startingModels: [{ id: 'ga-premier', name: 'Standard Six', price: 1200, cost: 600, stats: { pwrRatio: 3, safety: 10, power: 25, economy: 12 } }]
+    startingModels: [{ id: 'ga-premier', name: 'Standard Six', price: 1200, cost: 600, stats: { pwrRatio: 18, safety: 10, power: 35, economy: 12 } }]
   },
   {
     id: 'continental',
     name: 'Continental Cars',
     homeTerritory: 'europe',
     personality: { segment: 'Sport', expansion: 'Moderate', research: 'Balanced' },
-    startingModels: [{ id: 'cc-lemans', name: 'Le Mans', price: 1500, cost: 700, stats: { pwrRatio: 5, safety: 8, power: 35, economy: 10 } }]
+    startingModels: [{ id: 'cc-lemans', name: 'Le Mans', price: 1500, cost: 700, stats: { pwrRatio: 30, safety: 8, power: 45, economy: 10 } }]
   },
   {
     id: 'bavarian',
     name: 'Bavarian Engineering',
     homeTerritory: 'europe',
     personality: { segment: 'Luxury', expansion: 'Conservative', research: 'High' },
-    startingModels: [{ id: 'be-prestige', name: 'Prinz', price: 3000, cost: 1200, stats: { pwrRatio: 4, safety: 20, power: 45, economy: 8 } }]
+    startingModels: [{ id: 'be-prestige', name: 'Prinz', price: 3000, cost: 1200, stats: { pwrRatio: 22, safety: 20, power: 55, economy: 8 } }]
   },
   {
     id: 'britannia',
     name: 'Britannia Motor Co',
     homeTerritory: 'europe',
     personality: { segment: 'Utility', expansion: 'Aggressive', research: 'Conservative' },
-    startingModels: [{ id: 'bmc-rover', name: 'Rover', price: 1100, cost: 500, stats: { pwrRatio: 2, safety: 15, power: 20, economy: 12, durability: 60 } }]
+    startingModels: [{ id: 'bmc-rover', name: 'Rover', price: 1100, cost: 500, stats: { pwrRatio: 10, safety: 15, power: 25, economy: 12, durability: 60 } }]
   },
   {
     id: 'nippon',
     name: 'Nippon Steel & Motor',
     homeTerritory: 'east-asia',
     personality: { segment: 'Economy', expansion: 'Aggressive', research: 'High' },
-    startingModels: [{ id: 'nsm-compact', name: 'Sunrise', price: 900, cost: 450, stats: { pwrRatio: 2, safety: 10, power: 15, economy: 20 } }]
+    startingModels: [{ id: 'nsm-compact', name: 'Sunrise', price: 900, cost: 450, stats: { pwrRatio: 14, safety: 10, power: 20, economy: 20 } }]
   },
   {
     id: 'detroit-deluxe',
     name: 'Detroit Deluxe',
     homeTerritory: 'north-america',
     personality: { segment: 'Luxury', expansion: 'Conservative', research: 'Balanced' },
-    startingModels: [{ id: 'dd-brougham', name: 'Brougham', price: 4500, cost: 1800, stats: { pwrRatio: 3, safety: 25, power: 60, economy: 6 } }]
+    startingModels: [{ id: 'dd-brougham', name: 'Brougham', price: 4500, cost: 1800, stats: { pwrRatio: 20, safety: 25, power: 65, economy: 6 } }]
   },
   {
     id: 'volks-wagon',
     name: 'Volks-Wagon',
     homeTerritory: 'europe',
     personality: { segment: 'Economy', expansion: 'Aggressive', research: 'Balanced' },
-    startingModels: [{ id: 'vw-citizen', name: 'Citizen', price: 750, cost: 350, stats: { pwrRatio: 1.5, safety: 5, power: 12, economy: 25 } }]
+    startingModels: [{ id: 'vw-citizen', name: 'Citizen', price: 750, cost: 350, stats: { pwrRatio: 12, safety: 5, power: 15, economy: 25 } }]
   }
 ]
 
@@ -98,7 +98,7 @@ export const useCompetitorStore = defineStore('competitors', {
       this.insolventMonths = {}
     },
 
-    spawnNewRival(year) {
+    spawnNewRival() {
       const activeIds = this.competitors.map(c => c.id)
       const available = RIVAL_POOL.filter(r => !activeIds.includes(r.id))
       if (available.length > 0) {

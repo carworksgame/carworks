@@ -27,11 +27,11 @@
                 </q-badge>
               </q-card-section>
 
-              <q-card-section v-if="designStore.models.length === 0" class="text-center q-pa-md italic text-grey">
-                No designs available to build.
+              <q-card-section v-if="designStore.activeModels.length === 0" class="text-center q-pa-md italic text-grey">
+                No active designs available to build.
               </q-card-section>
               <q-list v-else separator>
-                <q-item v-for="model in designStore.models" :key="model.id" class="q-py-md">
+                <q-item v-for="model in designStore.activeModels" :key="model.id" class="q-py-md">
                   <q-item-section>
                     <div class="row items-center justify-between q-mb-sm">
                       <div class="text-subtitle1 text-weight-bold">{{ model.name }}</div>
@@ -42,7 +42,7 @@
                         :model-value="getAssignment(factory.id, model.id)"
                         @update:model-value="(val) => setAssignment(factory.id, model.id, val)"
                         :min="0"
-                        :max="factory.totalWorkers"
+                        :max="factory.totalWorkers - (getFactoryAssigned(factory.id) - getAssignment(factory.id, model.id))"
                         :step="1"
                         label
                         color="orange-9"
@@ -66,7 +66,7 @@
             <q-space />
             <q-select
               v-model="selectedModelId"
-              :options="designStore.models"
+              :options="designStore.activeModels"
               option-label="name"
               option-value="id"
               emit-value
@@ -151,7 +151,7 @@ const playerStore = usePlayerStore()
 const designStore = useDesignStore()
 
 const viewTab = ref('production')
-const selectedModelId = ref(designStore.models[0]?.id || null)
+const selectedModelId = ref(designStore.activeModels[0]?.id || null)
 
 const factoryOptions = computed(() => {
   return playerStore.factories.map(f => ({

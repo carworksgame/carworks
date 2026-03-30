@@ -18,68 +18,68 @@ export const useDesignStore = defineStore('design', {
     // Component libraries (Base costs in 1900 dollars)
     components: {
       chassis: [
-        { id: 'basic-chassis', name: 'Wooden Frame', cost: 150, weight: 500, durability: 15 },
-        { id: 'steel-reinforced', name: 'Reinforced Wood', cost: 300, weight: 600, durability: 30, requires: 'steel-reinforced' },
-        { id: 'all-steel-ladder', name: 'Steel Ladder Frame', cost: 600, weight: 800, durability: 55, requires: 'all-steel-ladder' },
-        { id: 'pressed-steel', name: 'Pressed Steel', cost: 900, weight: 700, durability: 65, requires: 'pressed-steel' },
-        { id: 'aerodynamic-body', name: 'Aerodynamic Body', cost: 1500, weight: 650, durability: 60, requires: 'aerodynamic-body' },
-        { id: 'monocoque', name: 'Unibody Construction', cost: 3000, weight: 550, durability: 80, requires: 'monocoque' },
-        { id: 'lightweight-alloys', name: 'Alloy Construction', cost: 8000, weight: 400, durability: 85, requires: 'lightweight-alloys' },
-        { id: 'carbon-fiber', name: 'Carbon Composite', cost: 25000, weight: 250, durability: 95, requires: 'carbon-fiber' },
+        { id: 'basic-chassis', name: 'Wooden Frame', cost: 150, weight: 1000, durability: 15 },
+        { id: 'steel-reinforced', name: 'Reinforced Wood', cost: 300, weight: 1200, durability: 30, requires: 'steel-reinforced' },
+        { id: 'all-steel-ladder', name: 'Steel Ladder Frame', cost: 600, weight: 1500, durability: 55, requires: 'all-steel-ladder' },
+        { id: 'pressed-steel', name: 'Pressed Steel', cost: 900, weight: 1400, durability: 65, requires: 'pressed-steel' },
+        { id: 'aerodynamic-body', name: 'Aerodynamic Body', cost: 1500, weight: 1300, durability: 60, requires: 'aerodynamic-body' },
+        { id: 'monocoque', name: 'Unibody Construction', cost: 3000, weight: 1100, durability: 80, requires: 'monocoque' },
+        { id: 'lightweight-alloys', name: 'Alloy Construction', cost: 8000, weight: 800, durability: 85, requires: 'lightweight-alloys' },
+        { id: 'carbon-fiber', name: 'Carbon Composite', cost: 25000, weight: 500, durability: 95, requires: 'carbon-fiber' },
       ],
       engine: [
-        { id: 'single-cylinder', name: 'Single-Cyl Engine', cost: 200, power: 8, weight: 150, economy: 8 },
-        { id: 'twin-cylinder', name: 'Twin-Cyl Engine', cost: 450, power: 15, weight: 250, economy: 10, requires: 'twin-cylinder' },
-        { id: 'inline-4', name: 'Early Inline 4', cost: 1000, power: 30, weight: 450, economy: 12, requires: 'inline-4' },
-        { id: 'ohv-engine', name: 'OHV Inline 4', cost: 1800, power: 45, weight: 400, economy: 15, requires: 'ohv-engine' },
-        { id: 'inline-6', name: 'Inline 6 Engine', cost: 2800, power: 85, weight: 650, economy: 14, requires: 'inline-6' },
-        { id: 'high-comp-i4', name: 'High-Comp I4', cost: 2500, power: 65, weight: 420, economy: 22, requires: 'high-comp-i4' },
-        { id: 'v8-engine', name: 'Flathead V8', cost: 4500, power: 110, weight: 800, economy: 10, requires: 'v8-engine' },
-        { id: 'improved-v8', name: 'OHV V8 Engine', cost: 7000, power: 180, weight: 750, economy: 12, requires: 'improved-v8' },
-        { id: 'early-diesel', name: 'Diesel Engine', cost: 6500, power: 100, weight: 950, economy: 28, requires: 'early-diesel' },
-        { id: 'high-output-v8', name: 'High-Output V8', cost: 12000, power: 350, weight: 850, economy: 8, requires: 'high-output-v8' },
-        { id: 'fuel-injection', name: 'Injected V8', cost: 15000, power: 420, weight: 800, economy: 14, requires: 'fuel-injection' },
-        { id: 'electronic-injection', name: 'Modern EFI Engine', cost: 10000, power: 220, weight: 500, economy: 32, requires: 'electronic-injection' },
-        { id: 'early-turbo', name: 'Turbo Inline-4', cost: 14000, power: 280, weight: 520, economy: 25, requires: 'early-turbo' },
-        { id: 'multi-valve', name: 'Multi-Valve I4', cost: 12000, power: 190, weight: 450, economy: 35, requires: 'multi-valve' },
-        { id: 'vvt-engine', name: 'VVT Engine', cost: 18000, power: 260, weight: 480, economy: 42, requires: 'vvt-engine' },
-        { id: 'early-hybrid', name: 'Hybrid Drive', cost: 35000, power: 200, weight: 1100, economy: 65, requires: 'early-hybrid' },
-        { id: 'modern-electric', name: 'Li-Ion Electric Drive', cost: 60000, power: 450, weight: 1500, economy: 120, requires: 'modern-electric' },
+        { id: 'single-cylinder', name: 'Single-Cyl Engine', cost: 200, power: 12, weight: 300, economy: 8 },
+        { id: 'twin-cylinder', name: 'Twin-Cyl Engine', cost: 450, power: 22, weight: 450, economy: 10, requires: 'twin-cylinder' },
+        { id: 'inline-4', name: 'Early Inline 4', cost: 1000, power: 35, weight: 600, economy: 12, requires: 'inline-4' },
+        { id: 'ohv-engine', name: 'OHV Inline 4', cost: 1800, power: 55, weight: 550, economy: 15, requires: 'ohv-engine' },
+        { id: 'inline-6', name: 'Inline 6 Engine', cost: 2800, power: 95, weight: 800, economy: 14, requires: 'inline-6' },
+        { id: 'high-comp-i4', name: 'High-Comp I4', cost: 2500, power: 75, weight: 500, economy: 22, requires: 'high-comp-i4' },
+        { id: 'v8-engine', name: 'Flathead V8', cost: 4500, power: 110, weight: 900, economy: 10, requires: 'v8-engine' },
+        { id: 'improved-v8', name: 'OHV V8 Engine', cost: 7000, power: 180, weight: 850, economy: 12, requires: 'improved-v8' },
+        { id: 'early-diesel', name: 'Diesel Engine', cost: 6500, power: 100, weight: 1100, economy: 28, requires: 'early-diesel' },
+        { id: 'high-output-v8', name: 'High-Output V8', cost: 12000, power: 350, weight: 950, economy: 8, requires: 'high-output-v8' },
+        { id: 'fuel-injection', name: 'Injected V8', cost: 15000, power: 420, weight: 900, economy: 14, requires: 'fuel-injection' },
+        { id: 'electronic-injection', name: 'Modern EFI Engine', cost: 10000, power: 220, weight: 600, economy: 32, requires: 'electronic-injection' },
+        { id: 'early-turbo', name: 'Turbo Inline-4', cost: 14000, power: 280, weight: 650, economy: 25, requires: 'early-turbo' },
+        { id: 'multi-valve', name: 'Multi-Valve I4', cost: 12000, power: 190, weight: 550, economy: 35, requires: 'multi-valve' },
+        { id: 'vvt-engine', name: 'VVT Engine', cost: 18000, power: 260, weight: 580, economy: 42, requires: 'vvt-engine' },
+        { id: 'early-hybrid', name: 'Hybrid Drive', cost: 35000, power: 200, weight: 1400, economy: 65, requires: 'early-hybrid' },
+        { id: 'modern-electric', name: 'Li-Ion Electric Drive', cost: 60000, power: 450, weight: 1800, economy: 120, requires: 'modern-electric' },
       ],
       steering: [
-        { id: 'tiller-steering', name: 'Tiller', cost: 30, safety: 2, weight: 10 },
-        { id: 'steering-wheel', name: 'Steering Wheel', cost: 120, safety: 15, weight: 30, requires: 'steering-wheel' },
-        { id: 'leaf-springs', name: 'Leaf Springs', cost: 250, safety: 20, weight: 80, requires: 'leaf-springs' },
-        { id: 'shock-absorbers', name: 'Shock Absorbers', cost: 600, safety: 35, weight: 60, requires: 'shock-absorbers' },
-        { id: 'ifs-handling', name: 'Indep. Suspension', cost: 1500, safety: 50, weight: 50, requires: 'ifs-handling' },
-        { id: 'power-steering', name: 'Power Steering', cost: 3500, safety: 65, weight: 80, requires: 'power-steering' },
-        { id: 'rack-and-pinion', name: 'Rack & Pinion', cost: 5000, safety: 80, weight: 40, requires: 'rack-and-pinion' },
-        { id: 'esc-handling', name: 'ESC System', cost: 15000, safety: 95, weight: 20, requires: 'esc-handling' },
+        { id: 'tiller-steering', name: 'Tiller', cost: 30, safety: 2, weight: 40 },
+        { id: 'steering-wheel', name: 'Steering Wheel', cost: 120, safety: 15, weight: 80, requires: 'steering-wheel' },
+        { id: 'leaf-springs', name: 'Leaf Springs', cost: 250, safety: 20, weight: 150, requires: 'leaf-springs' },
+        { id: 'shock-absorbers', name: 'Shock Absorbers', cost: 600, safety: 35, weight: 100, requires: 'shock-absorbers' },
+        { id: 'ifs-handling', name: 'Indep. Suspension', cost: 1500, safety: 50, weight: 80, requires: 'ifs-handling' },
+        { id: 'power-steering', name: 'Power Steering', cost: 3500, safety: 65, weight: 100, requires: 'power-steering' },
+        { id: 'rack-and-pinion', name: 'Rack & Pinion', cost: 5000, safety: 80, weight: 60, requires: 'rack-and-pinion' },
+        { id: 'esc-handling', name: 'ESC System', cost: 15000, safety: 95, weight: 30, requires: 'esc-handling' },
       ],
       brakes: [
-        { id: 'wood-brakes', name: 'Wood Block Brakes', cost: 15, safety: 2, weight: 5 },
-        { id: 'drum-brakes', name: 'Drum Brakes', cost: 150, safety: 20, weight: 40, requires: 'drum-brakes' },
-        { id: 'mechanical-4-wheel', name: '4-Wheel Drums', cost: 400, safety: 35, weight: 80, requires: 'mechanical-4-wheel' },
-        { id: 'hydraulic-brakes', name: 'Hydraulic Brakes', cost: 1200, safety: 55, weight: 60, requires: 'hydraulic-brakes' },
-        { id: 'disc-brakes', name: 'Front Disc Brakes', cost: 3500, safety: 75, weight: 40, requires: 'disc-brakes' },
-        { id: 'abs-brakes', name: 'ABS System', cost: 12000, safety: 90, weight: 30, requires: 'abs-brakes' },
+        { id: 'wood-brakes', name: 'Wood Block Brakes', cost: 15, safety: 2, weight: 20 },
+        { id: 'drum-brakes', name: 'Drum Brakes', cost: 150, safety: 20, weight: 80, requires: 'drum-brakes' },
+        { id: 'mechanical-4-wheel', name: '4-Wheel Drums', cost: 400, safety: 35, weight: 150, requires: 'mechanical-4-wheel' },
+        { id: 'hydraulic-brakes', name: 'Hydraulic Brakes', cost: 1200, safety: 55, weight: 100, requires: 'hydraulic-brakes' },
+        { id: 'disc-brakes', name: 'Front Disc Brakes', cost: 3500, safety: 75, weight: 80, requires: 'disc-brakes' },
+        { id: 'abs-brakes', name: 'ABS System', cost: 12000, safety: 90, weight: 50, requires: 'abs-brakes' },
       ],
       features: [
-        { id: 'gas-lanterns', name: 'Gas Lanterns', cost: 100, safety: 5, weight: 20 },
-        { id: 'electric-lights', name: 'Electric Lights', cost: 400, safety: 15, weight: 15, requires: 'electric-lights' },
-        { id: 'enclosed-cabin', name: 'Enclosed Cabin', cost: 1500, safety: 20, weight: 300, requires: 'enclosed-cabin' },
-        { id: 'car-radio', name: 'AM Radio', cost: 800, safety: 0, weight: 25, requires: 'car-radio' },
-        { id: 'car-heater', name: 'Interior Heater', cost: 500, safety: 0, weight: 40, requires: 'car-heater' },
-        { id: 'seat-belts', name: 'Lap Belts', cost: 300, safety: 30, weight: 10, requires: 'seat-belts' },
-        { id: 'air-conditioning', name: 'Air Conditioning', cost: 4500, safety: 0, weight: 120, requires: 'air-conditioning' },
-        { id: 'disc-brakes', name: 'Safety Glass', cost: 1000, safety: 10, weight: 50, requires: 'disc-brakes' }, 
-        { id: 'power-windows', name: 'Power Windows', cost: 2500, safety: 0, weight: 60, requires: 'power-windows' },
-        { id: 'collapsible-column', name: 'Safety Column', cost: 2000, safety: 15, weight: 20, requires: 'collapsible-column' },
-        { id: 'cd-player', name: 'CD Player', cost: 1200, safety: 0, weight: 10, requires: 'cd-player' },
-        { id: 'driver-airbag', name: 'Driver Airbag', cost: 8000, safety: 40, weight: 30, requires: 'driver-airbag' },
-        { id: 'navigation-gps', name: 'GPS Navigation', cost: 15000, safety: 0, weight: 15, requires: 'navigation-gps' },
-        { id: 'full-airbags', name: 'Full Airbag Suite', cost: 20000, safety: 60, weight: 50, requires: 'full-airbags' },
-        { id: 'infotainment', name: 'Infotainment', cost: 35000, safety: 0, weight: 20, requires: 'infotainment' },
+        { id: 'gas-lanterns', name: 'Gas Lanterns', cost: 100, safety: 5, weight: 50 },
+        { id: 'electric-lights', name: 'Electric Lights', cost: 400, safety: 15, weight: 40, requires: 'electric-lights' },
+        { id: 'enclosed-cabin', name: 'Enclosed Cabin', cost: 1500, safety: 20, weight: 600, requires: 'enclosed-cabin' },
+        { id: 'car-radio', name: 'AM Radio', cost: 800, safety: 0, weight: 40, requires: 'car-radio' },
+        { id: 'car-heater', name: 'Interior Heater', cost: 500, safety: 0, weight: 60, requires: 'car-heater' },
+        { id: 'seat-belts', name: 'Lap Belts', cost: 300, safety: 30, weight: 20, requires: 'seat-belts' },
+        { id: 'air-conditioning', name: 'Air Conditioning', cost: 4500, safety: 0, weight: 180, requires: 'air-conditioning' },
+        { id: 'disc-brakes', name: 'Safety Glass', cost: 1000, safety: 10, weight: 80, requires: 'disc-brakes' }, 
+        { id: 'power-windows', name: 'Power Windows', cost: 2500, safety: 0, weight: 80, requires: 'power-windows' },
+        { id: 'collapsible-column', name: 'Safety Column', cost: 2000, safety: 15, weight: 30, requires: 'collapsible-column' },
+        { id: 'cd-player', name: 'CD Player', cost: 1200, safety: 0, weight: 15, requires: 'cd-player' },
+        { id: 'driver-airbag', name: 'Driver Airbag', cost: 8000, safety: 40, weight: 40, requires: 'driver-airbag' },
+        { id: 'navigation-gps', name: 'GPS Navigation', cost: 15000, safety: 0, weight: 20, requires: 'navigation-gps' },
+        { id: 'full-airbags', name: 'Full Airbag Suite', cost: 20000, safety: 60, weight: 80, requires: 'full-airbags' },
+        { id: 'infotainment', name: 'Infotainment', cost: 35000, safety: 0, weight: 30, requires: 'infotainment' },
       ]
     },
     durabilityMatrix: {
@@ -97,6 +97,7 @@ export const useDesignStore = defineStore('design', {
   persist: true,
 
   getters: {
+    activeModels: (state) => state.models.filter(m => !m.archived),
     getUnlockedComponents: (state) => (unlockedTech) => {
       const worldStore = useWorldStore()
       const filtered = {}
@@ -136,7 +137,7 @@ export const useDesignStore = defineStore('design', {
       playerStore.funds -= testFee
       const variance = 0.85 + (Math.random() * 0.3)
       const base = this.activePrototype.stats
-      if (testId === 'acceleration') this.activePrototype.results.acceleration = (20 / (base.pwrRatio / 10 || 1)) * variance
+      if (testId === 'acceleration') this.activePrototype.results.acceleration = (480 / (base.pwrRatio || 1)) * variance
       else if (testId === 'braking') this.activePrototype.results.braking = (200 / (base.safety / 20 || 1)) * variance
       else if (testId === 'economy') this.activePrototype.results.economy = base.economy * variance
       else if (testId === 'safety') this.activePrototype.results.safety = Math.min(100, base.safety * variance)
@@ -166,7 +167,8 @@ export const useDesignStore = defineStore('design', {
         stats: finalStats,
         components: this.activePrototype.components,
         id: Date.now(),
-        introduced: gameStore.year
+        introduced: gameStore.year,
+        archived: false
       }
 
       this.models.push(newModel)
@@ -182,6 +184,20 @@ export const useDesignStore = defineStore('design', {
     },
 
     scrapPrototype() { this.activePrototype = null },
+
+    archiveModel(modelId) {
+      const model = this.models.find(m => m.id === modelId)
+      if (model) {
+        model.archived = true
+      }
+    },
+
+    restoreModel(modelId) {
+      const model = this.models.find(m => m.id === modelId)
+      if (model) {
+        model.archived = false
+      }
+    },
 
     resolveIssue(issueId) {
       const playerStore = usePlayerStore()

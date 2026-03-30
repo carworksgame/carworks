@@ -138,7 +138,6 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { useResearchStore } from '../stores/research'
 import { usePlayerStore } from '../stores/player'
 

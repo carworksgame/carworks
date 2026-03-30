@@ -37,7 +37,7 @@
               <div class="col">
                 <q-select
                   v-model="worldStore.participatingModelId"
-                  :options="designStore.models"
+                  :options="designStore.activeModels"
                   option-label="name"
                   option-value="id"
                   emit-value
@@ -145,13 +145,13 @@
           <div v-if="!selectedTerritory?.active" class="text-center q-pa-xl text-grey italic">
             Marketing actions unavailable for locked territories.
           </div>
-          <div v-else-if="designStore.models.length === 0" class="text-center q-pa-xl text-grey">
-            No vehicle models available to market.
+          <div v-else-if="designStore.activeModels.length === 0" class="text-center q-pa-xl text-grey">
+            No active vehicle models available to market.
           </div>
           
           <q-list v-else separator>
             <q-expansion-item
-              v-for="model in designStore.models"
+              v-for="model in designStore.activeModels"
               :key="model.id"
               group="campaigns"
               header-class="q-py-md"
