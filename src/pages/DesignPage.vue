@@ -125,6 +125,9 @@
                :chassis-id="currentDesign.chassis?.id"
                :engine-id="currentDesign.engine?.id"
                :steering-id="currentDesign.steering?.id"
+               :brakes-id="currentDesign.brakes?.id"
+               :vehicle-class="currentDesign.vehicleClass"
+               :features="currentDesign.features"
                :tech="researchStore.unlockedTech"
              />
           </div>
@@ -218,7 +221,10 @@
              :chassis-id="model.components.chassis"
              :engine-id="model.components.engine"
              :steering-id="model.components.steering"
-             :tech="researchStore.unlockedTech"
+             :brakes-id="model.components.brakes"
+             :vehicle-class="model.vehicleClass"
+             :features="model.components.features"
+             :tech="model.unlockedTechSnapshot || researchStore.unlockedTech"
              style="height: 150px"
            />
            <div class="row justify-between q-mt-md">
@@ -358,6 +364,7 @@ function startPrototype() {
     cost: totalCost.value,
     weight: totalWeight.value,
     stats: { ...stats.value },
+    unlockedTechSnapshot: [...researchStore.unlockedTech],
     components: {
       chassis: currentDesign.chassis.id,
       engine: currentDesign.engine.id,

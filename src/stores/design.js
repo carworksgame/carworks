@@ -166,6 +166,7 @@ export const useDesignStore = defineStore('design', {
         weight: this.activePrototype.weight,
         stats: finalStats,
         components: this.activePrototype.components,
+        unlockedTechSnapshot: this.activePrototype.unlockedTechSnapshot || [],
         id: Date.now(),
         introduced: gameStore.year,
         archived: false
