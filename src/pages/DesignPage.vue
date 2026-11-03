@@ -271,7 +271,7 @@ import { useDesignStore, VEHICLE_CLASSES } from '../stores/design'
 import { useResearchStore } from '../stores/research'
 import { useGameStore } from '../stores/game'
 import { useQuasar } from 'quasar'
-import VehicleBlueprint from 'components/VehicleBlueprint.vue'
+import VehicleBlueprint from '@/components/VehicleBlueprint.vue'
 
 const designStore = useDesignStore()
 const researchStore = useResearchStore()

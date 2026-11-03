@@ -7,7 +7,7 @@ import {
   signOut,
   onAuthStateChanged
 } from 'firebase/auth'
-import { auth } from 'boot/firebase'
+import { auth } from '@/boot/firebase'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({

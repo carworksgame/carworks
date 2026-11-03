@@ -1,7 +1,7 @@
 // Configuration for your app
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file
 
-import { defineConfig } from '#q-app/wrappers'
+import { defineConfig } from '#q-app'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig((ctx) => {
@@ -52,7 +52,9 @@ export default defineConfig((ctx) => {
 
       // publicPath: '/',
       // analyze: true,
-      // env: {},
+      env: {
+        clientPrefix: ['QCLI_', 'VITE_']
+      },
       // rawDefine: {}
       // ignorePublicFolder: true,
       // minify: false,

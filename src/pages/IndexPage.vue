@@ -2,7 +2,7 @@
   <q-page class="bg-black flex flex-center no-scroll overflow-hidden">
     <div class="factory-container shadow-10 overflow-hidden relative-position">
       <!-- The visual backdrop -->
-      <img src="~assets/images/factory.png" class="factory-image" />
+      <img src="@/assets/images/factory.png" class="factory-image" />
 
       <!-- SVG Grid Overlay (6x6) -->
       <svg 

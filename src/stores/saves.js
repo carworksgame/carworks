@@ -1,5 +1,5 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
-import { db } from 'boot/firebase'
+import { db } from '@/boot/firebase'
 import { collection, doc, getDocs, setDoc, deleteDoc, getDoc } from 'firebase/firestore'
 import { useAuthStore } from './auth'
 import { useGameStore } from './game'
