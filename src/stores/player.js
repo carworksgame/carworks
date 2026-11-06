@@ -186,7 +186,9 @@ export const usePlayerStore = defineStore('player', {
         import('./design').then(m => {
           const designStore = m.useDesignStore()
           designStore.models.forEach(model => {
-            this.initializeDistribution(model.id, territory.id)
+            const base1900 = model.baseCost1900 || designStore.getBaseComponentCost(model.components)
+            const suggestedPrice = Math.round(base1900 * worldStore.inflationMultiplier * 1.85)
+            this.initializeDistribution(model.id, territory.id, suggestedPrice)
           })
         })
 
@@ -195,12 +197,12 @@ export const usePlayerStore = defineStore('player', {
       return false
     },
 
-    initializeDistribution(modelId, territoryId) {
+    initializeDistribution(modelId, territoryId, initialPrice = 1000) {
       if (!this.regionalDistribution[territoryId]) this.regionalDistribution[territoryId] = {}
       if (!this.regionalDistribution[territoryId][modelId]) {
         const primaryFactoryId = this.factories[0]?.id || 1
         this.regionalDistribution[territoryId][modelId] = {
-          price: 1000, 
+          price: initialPrice, 
           priorities: [primaryFactoryId]
         }
       }

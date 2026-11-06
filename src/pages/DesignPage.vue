@@ -117,6 +117,10 @@
                 <div class="row justify-between text-caption"><span>Safety Rating</span><span>{{ stats.safety }}%</span></div>
                 <q-linear-progress :value="stats.safety / 100" color="orange" />
               </div>
+              <div class="q-mb-xs">
+                <div class="row justify-between text-caption"><span>Comfort & Appeal</span><span>{{ stats.appeal }} pts</span></div>
+                <q-linear-progress :value="stats.appeal / 150" color="purple" />
+              </div>
             </div>
           </div>
 
@@ -228,8 +232,8 @@
              style="height: 150px"
            />
            <div class="row justify-between q-mt-md">
-             <span>Cost:</span>
-             <span class="text-weight-bold">${{ model.cost.toLocaleString() }}</span>
+             <span>Unit Cost:</span>
+             <span class="text-weight-bold">${{ getModelCurrentCost(model).toLocaleString() }}</span>
            </div>
            <div class="row justify-between text-caption text-grey-8">
              <span>Real Economy:</span>
@@ -270,13 +274,20 @@ import { reactive, computed, watch } from 'vue'
 import { useDesignStore, VEHICLE_CLASSES } from '../stores/design'
 import { useResearchStore } from '../stores/research'
 import { useGameStore } from '../stores/game'
+import { useWorldStore } from '../stores/world'
 import { useQuasar } from 'quasar'
 import VehicleBlueprint from '@/components/VehicleBlueprint.vue'
 
 const designStore = useDesignStore()
 const researchStore = useResearchStore()
 const gameStore = useGameStore()
+const worldStore = useWorldStore()
 const $q = useQuasar()
+
+function getModelCurrentCost(model) {
+  const base1900 = model.baseCost1900 || designStore.getBaseComponentCost(model.components)
+  return Math.round(base1900 * worldStore.inflationMultiplier)
+}
 
 const unlockedComponents = computed(() => designStore.getUnlockedComponents(researchStore.unlockedTech))
 
@@ -334,10 +345,16 @@ const totalWeight = computed(() => {
 
 const stats = computed(() => {
   const featureSafety = currentDesign.features.reduce((acc, f) => acc + (f.safety || 0), 0)
+  const featureAppeal = currentDesign.features.reduce((acc, f) => acc + (f.appeal || 0), 0)
+  const chassisAppeal = currentDesign.chassis?.appeal || 0
+  const steeringAppeal = currentDesign.steering?.appeal || 0
+  const durability = currentDesign.chassis?.durability || 15
   return {
     power: currentDesign.engine?.power || 0,
     economy: currentDesign.engine?.economy || 0,
     safety: (currentDesign.steering?.safety || 0) + (currentDesign.brakes?.safety || 0) + featureSafety,
+    appeal: chassisAppeal + steeringAppeal + featureAppeal,
+    durability,
     pwrRatio: (currentDesign.engine?.power / totalWeight.value) * 1000 || 0
   }
 })

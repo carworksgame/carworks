@@ -784,8 +784,8 @@ function handleLayoffWorkers(factory) {
 }
 
 function handleAcquisition(comp) {
-  const assetValue = comp.factories.length * 15000 + (comp.unlockedTech.length * 2000)
-  const price = Math.round(assetValue * 0.6) 
+  const assetValue = (comp.factories.length * 45000 + (comp.unlockedTech.length * 4000)) * worldStore.inflationMultiplier
+  const price = Math.round(assetValue * 0.75) 
   $q.dialog({ title: 'Acquire Rival', message: `Acquire ${comp.name} for $${price.toLocaleString()}?`, cancel: true, persistent: true }).onOk(() => {
     if (playerStore.funds >= price) {
       playerStore.funds -= price

@@ -7,184 +7,330 @@ export const RIVAL_POOL = [
     name: 'Blue Oval Motors',
     homeTerritory: 'north-america',
     personality: { segment: 'Economy', expansion: 'Aggressive', research: 'Balanced' },
-    startingModels: [{ id: 'blue-oval-t', name: 'Model T-Rival', price: 850, cost: 400, stats: { pwrRatio: 13, safety: 5, power: 20, economy: 15 } }]
+    startingModels: [{
+      id: 'blue-oval-t', name: 'Model T-Rival', vehicleClass: 'Economy',
+      price: 750, cost: 340, introduced: 1900,
+      stats: { pwrRatio: 11, safety: 10, power: 16, economy: 14, appeal: 8, durability: 25 }
+    }]
   },
   {
     id: 'general-auto',
     name: 'General Auto',
     homeTerritory: 'north-america',
-    personality: { segment: 'Balanced', expansion: 'Moderate', research: 'High' },
-    startingModels: [{ id: 'ga-premier', name: 'Standard Six', price: 1200, cost: 600, stats: { pwrRatio: 18, safety: 10, power: 35, economy: 12 } }]
+    personality: { segment: 'Utility', expansion: 'Moderate', research: 'High' },
+    startingModels: [{
+      id: 'ga-premier', name: 'Standard Six', vehicleClass: 'Utility',
+      price: 900, cost: 410, introduced: 1900,
+      stats: { pwrRatio: 14, safety: 14, power: 24, economy: 12, appeal: 12, durability: 45 }
+    }]
   },
   {
     id: 'continental',
     name: 'Continental Cars',
     homeTerritory: 'europe',
     personality: { segment: 'Sport', expansion: 'Moderate', research: 'Balanced' },
-    startingModels: [{ id: 'cc-lemans', name: 'Le Mans', price: 1500, cost: 700, stats: { pwrRatio: 30, safety: 8, power: 45, economy: 10 } }]
+    startingModels: [{
+      id: 'cc-lemans', name: 'Le Mans', vehicleClass: 'Sport',
+      price: 1350, cost: 540, introduced: 1900,
+      stats: { pwrRatio: 26, safety: 12, power: 40, economy: 10, appeal: 22, durability: 30 }
+    }]
   },
   {
     id: 'bavarian',
     name: 'Bavarian Engineering',
     homeTerritory: 'europe',
     personality: { segment: 'Luxury', expansion: 'Conservative', research: 'High' },
-    startingModels: [{ id: 'be-prestige', name: 'Prinz', price: 3000, cost: 1200, stats: { pwrRatio: 22, safety: 20, power: 55, economy: 8 } }]
+    startingModels: [{
+      id: 'be-prestige', name: 'Prinz', vehicleClass: 'Luxury',
+      price: 1850, cost: 720, introduced: 1900,
+      stats: { pwrRatio: 20, safety: 25, power: 48, economy: 10, appeal: 35, durability: 50 }
+    }]
   },
   {
     id: 'britannia',
     name: 'Britannia Motor Co',
     homeTerritory: 'europe',
     personality: { segment: 'Utility', expansion: 'Aggressive', research: 'Conservative' },
-    startingModels: [{ id: 'bmc-rover', name: 'Rover', price: 1100, cost: 500, stats: { pwrRatio: 10, safety: 15, power: 25, economy: 12, durability: 60 } }]
+    startingModels: [{
+      id: 'bmc-rover', name: 'Rover', vehicleClass: 'Utility',
+      price: 850, cost: 390, introduced: 1900,
+      stats: { pwrRatio: 12, safety: 16, power: 22, economy: 13, appeal: 10, durability: 55 }
+    }]
   },
   {
     id: 'nippon',
     name: 'Nippon Steel & Motor',
     homeTerritory: 'east-asia',
     personality: { segment: 'Economy', expansion: 'Aggressive', research: 'High' },
-    startingModels: [{ id: 'nsm-compact', name: 'Sunrise', price: 900, cost: 450, stats: { pwrRatio: 14, safety: 10, power: 20, economy: 20 } }]
+    startingModels: [{
+      id: 'nsm-compact', name: 'Sunrise', vehicleClass: 'Economy',
+      price: 720, cost: 320, introduced: 1900,
+      stats: { pwrRatio: 12, safety: 12, power: 18, economy: 18, appeal: 10, durability: 35 }
+    }]
   },
   {
     id: 'detroit-deluxe',
     name: 'Detroit Deluxe',
     homeTerritory: 'north-america',
     personality: { segment: 'Luxury', expansion: 'Conservative', research: 'Balanced' },
-    startingModels: [{ id: 'dd-brougham', name: 'Brougham', price: 4500, cost: 1800, stats: { pwrRatio: 20, safety: 25, power: 65, economy: 6 } }]
+    startingModels: [{
+      id: 'dd-brougham', name: 'Brougham', vehicleClass: 'Luxury',
+      price: 2100, cost: 800, introduced: 1900,
+      stats: { pwrRatio: 18, safety: 28, power: 55, economy: 9, appeal: 40, durability: 50 }
+    }]
   },
   {
     id: 'volks-wagon',
     name: 'Volks-Wagon',
     homeTerritory: 'europe',
     personality: { segment: 'Economy', expansion: 'Aggressive', research: 'Balanced' },
-    startingModels: [{ id: 'vw-citizen', name: 'Citizen', price: 750, cost: 350, stats: { pwrRatio: 12, safety: 5, power: 15, economy: 25 } }]
+    startingModels: [{
+      id: 'vw-citizen', name: 'Citizen', vehicleClass: 'Economy',
+      price: 680, cost: 300, introduced: 1900,
+      stats: { pwrRatio: 11, safety: 10, power: 15, economy: 20, appeal: 9, durability: 35 }
+    }]
   }
 ]
+
+function buildEraScaledModel(baseModel, year, targetSegment) {
+  const yearsElapsed = Math.max(0, year - 1900)
+  const decadeProgress = yearsElapsed / 10
+  const vehicleClass = targetSegment || baseModel.vehicleClass || 'Utility'
+
+  const baseCostByClass = {
+    Economy: 310 + Math.round(decadeProgress * 45),
+    Utility: 380 + Math.round(decadeProgress * 55),
+    Sport: 490 + Math.round(decadeProgress * 75),
+    Luxury: 640 + Math.round(decadeProgress * 95)
+  }
+  const cost = baseCostByClass[vehicleClass] || 400
+  const marginByClass = { Economy: 1.75, Utility: 1.85, Sport: 2.1, Luxury: 2.35 }
+  const price = Math.round(cost * (marginByClass[vehicleClass] || 1.85))
+
+  return {
+    ...baseModel,
+    id: `${baseModel.id}-${year}`,
+    name: yearsElapsed > 5 ? `${baseModel.name} '${String(year).slice(-2)}` : baseModel.name,
+    vehicleClass,
+    introduced: year,
+    cost,
+    price,
+    stats: {
+      pwrRatio: Math.round((baseModel.stats.pwrRatio || 12) + decadeProgress * (vehicleClass === 'Sport' ? 8 : 4.5)),
+      safety: Math.min(98, Math.round((baseModel.stats.safety || 10) + decadeProgress * 7)),
+      power: Math.round((baseModel.stats.power || 20) + decadeProgress * (vehicleClass === 'Sport' ? 28 : 18)),
+      economy: Math.round((baseModel.stats.economy || 12) + decadeProgress * (vehicleClass === 'Economy' ? 3.5 : 2)),
+      appeal: Math.round((baseModel.stats.appeal || 10) + decadeProgress * (vehicleClass === 'Luxury' ? 12 : 7)),
+      durability: Math.min(95, Math.round((baseModel.stats.durability || 30) + decadeProgress * 5.5))
+    }
+  }
+}
 
 export const useCompetitorStore = defineStore('competitors', {
   state: () => ({
     competitors: [],
-    insolventMonths: {} 
+    insolventMonths: {}
   }),
 
   persist: true,
 
   actions: {
     initializeRivals() {
-      const shuffled = [...RIVAL_POOL].sort(() => 0.5 - Math.random())
-      const selected = shuffled.slice(0, 3)
+      // Pick a balanced set of early rivals so both 1900 segments (Utility & Economy) are contested
+      const economyRivals = RIVAL_POOL.filter(r => r.personality.segment === 'Economy')
+      const utilityRivals = RIVAL_POOL.filter(r => r.personality.segment === 'Utility')
+      const otherRivals = RIVAL_POOL.filter(r => !['Economy', 'Utility'].includes(r.personality.segment))
 
-      this.competitors = selected.map(rival => ({
-        id: rival.id,
-        name: rival.name,
-        homeTerritory: rival.homeTerritory,
-        personality: rival.personality,
-        funds: 100000,
-        reputation: 50,
-        status: 'normal',
-        unlockedTech: ['basic-chassis', 'single-cylinder', 'wood-brakes', 'tiller-steering', 'gas-lanterns'],
-        unlockedTerritories: [rival.homeTerritory],
-        regionalShowrooms: { [rival.homeTerritory]: 1 },
-        models: JSON.parse(JSON.stringify(rival.startingModels)),
-        marketShare: 0,
-        factories: [{ 
-          id: `ai-f-${rival.id}`, location: `${rival.name} HQ`, 
-          level: 1, employees: 150, productivity: 1.0, 
-          territory: rival.homeTerritory, salary: 50 
-        }],
-        researchInvestment: 500,
-        regionalInventory: {},
-        lastTurnLedger: { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0, net: 0 }
-      }))
-      this.insolventMonths = {}
-    },
+      const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)]
+      const selected = [
+        pickRandom(utilityRivals),
+        pickRandom(economyRivals),
+        pickRandom([...utilityRivals, ...economyRivals, ...otherRivals].filter(Boolean))
+      ]
+      // Deduplicate if needed
+      const uniqueSelected = [...new Map(selected.map(r => [r.id, r])).values()]
+      while (uniqueSelected.length < 3) {
+        const next = pickRandom(RIVAL_POOL.filter(r => !uniqueSelected.some(u => u.id === r.id)))
+        if (next) uniqueSelected.push(next)
+      }
 
-    spawnNewRival() {
-      const activeIds = this.competitors.map(c => c.id)
-      const available = RIVAL_POOL.filter(r => !activeIds.includes(r.id))
-      if (available.length > 0) {
-        const rival = available[Math.floor(Math.random() * available.length)]
-        const newRival = {
+      this.competitors = uniqueSelected.map(rival => {
+        // Ensure every rival can sell in North America (the starting active market) as well as their home territory
+        const initialTerritories = Array.from(new Set(['north-america', rival.homeTerritory]))
+        const showrooms = {}
+        initialTerritories.forEach(tId => { showrooms[tId] = 1 })
+
+        const initialSegment = ['Utility', 'Economy'].includes(rival.personality.segment)
+          ? rival.personality.segment
+          : 'Utility'
+
+        return {
           id: rival.id,
           name: rival.name,
           homeTerritory: rival.homeTerritory,
           personality: rival.personality,
-          funds: 150000,
-          reputation: 40,
+          funds: 120000,
+          reputation: 52,
           status: 'normal',
-          unlockedTech: ['improved-v8', 'all-steel-ladder', 'hydraulic-brakes', 'shock-absorbers', 'enclosed-cabin'],
-          unlockedTerritories: [rival.homeTerritory],
-          regionalShowrooms: { [rival.homeTerritory]: 2 },
-          models: JSON.parse(JSON.stringify(rival.startingModels)),
+          unlockedTech: ['basic-chassis', 'single-cylinder', 'wood-brakes', 'tiller-steering', 'gas-lanterns'],
+          unlockedTerritories: initialTerritories,
+          regionalShowrooms: showrooms,
+          models: [buildEraScaledModel(rival.startingModels[0], 1900, initialSegment)],
           marketShare: 0,
-          factories: [{ id: `ai-f-${rival.id}`, location: `${rival.name} Base`, level: 2, employees: 200, productivity: 1.2, territory: rival.homeTerritory, salary: 150 }],
-          researchInvestment: 1000,
+          factories: [{
+            id: `ai-f-${rival.id}`,
+            location: `${rival.name} HQ`,
+            level: 1,
+            employees: 110,
+            productivity: 1.0,
+            territory: 'north-america',
+            salary: 50
+          }],
+          researchInvestment: 400,
           regionalInventory: {},
           lastTurnLedger: { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0, net: 0 }
         }
-        this.competitors.push(newRival)
-        return newRival
-      }
-      return null
+      })
+      this.insolventMonths = {}
     },
 
-    processAITurns(year, techPool) {
+    spawnNewRival(year = 1925, targetSegment = null) {
+      const worldStore = useWorldStore()
+      const activeIds = this.competitors.map(c => c.id)
+      let available = RIVAL_POOL.filter(r => !activeIds.includes(r.id))
+      if (available.length === 0) return null
+
+      // Prefer a rival matching the underserved targetSegment if one was specified
+      const matchingSegment = targetSegment ? available.filter(r => r.personality.segment === targetSegment) : []
+      const poolToPick = matchingSegment.length > 0 ? matchingSegment : available
+      const rival = poolToPick[Math.floor(Math.random() * poolToPick.length)]
+
+      const activeTerritoryIds = worldStore.territories.filter(t => t.active).map(t => t.id)
+      const unlockedTerritories = Array.from(new Set(['north-america', rival.homeTerritory, ...activeTerritoryIds]))
+      const showrooms = {}
+      unlockedTerritories.forEach(tId => { showrooms[tId] = 2 })
+
+      const chosenSegment = targetSegment || (rival.personality.segment === 'Balanced' ? 'Economy' : rival.personality.segment)
+      const scaledFunds = Math.round(150000 * worldStore.inflationMultiplier)
+      const baseWage = worldStore.territories.find(t => t.id === 'north-america')?.baseWage || 50
+
+      const newRival = {
+        id: rival.id,
+        name: rival.name,
+        homeTerritory: rival.homeTerritory,
+        personality: rival.personality,
+        funds: scaledFunds,
+        reputation: 50,
+        status: 'normal',
+        unlockedTech: ['all-steel-ladder', 'inline-4', 'hydraulic-brakes', 'shock-absorbers', 'enclosed-cabin'],
+        unlockedTerritories,
+        regionalShowrooms: showrooms,
+        models: [buildEraScaledModel(rival.startingModels[0], year, chosenSegment)],
+        marketShare: 0,
+        factories: [{
+          id: `ai-f-${rival.id}`,
+          location: `${rival.name} Works`,
+          level: Math.min(4, 1 + Math.floor((year - 1900) / 25)),
+          employees: 140 + Math.min(260, Math.floor((year - 1900) * 2.5)),
+          productivity: 1.15,
+          territory: activeTerritoryIds.includes(rival.homeTerritory) ? rival.homeTerritory : 'north-america',
+          salary: baseWage
+        }],
+        researchInvestment: Math.round(600 * worldStore.inflationMultiplier),
+        regionalInventory: {},
+        lastTurnLedger: { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0, net: 0 }
+      }
+      this.competitors.push(newRival)
+      this.insolventMonths[newRival.id] = 0
+      return newRival
+    },
+
+    processAITurns(year, techPool, activeSegments = {}) {
+      const worldStore = useWorldStore()
+      const validSegments = Object.keys(activeSegments)
+
       this.competitors.forEach(comp => {
         if (comp.status === 'distressed') return
 
+        // Ensure AI models have a valid vehicleClass for the current era
+        comp.models.forEach(m => {
+          const preferred = comp.personality.segment === 'Balanced' ? 'Economy' : comp.personality.segment
+          if (!m.vehicleClass || !validSegments.includes(m.vehicleClass)) {
+            m.vehicleClass = validSegments.includes(preferred) ? preferred : (validSegments[0] || 'Utility')
+          }
+        })
+
+        // Keep AI factory wages aligned with current era base wages
+        comp.factories.forEach(f => {
+          const terr = worldStore.territories.find(t => t.id === f.territory)
+          if (terr) f.salary = terr.baseWage
+        })
+
         // 1. Strategic Research
-        const researchChance = comp.personality.research === 'High' ? 0.3 : 0.1
+        const researchChance = comp.personality.research === 'High' ? 0.35 : 0.18
         if (Math.random() < researchChance) {
           const available = techPool.filter(t => !comp.unlockedTech.includes(t.id))
           if (available.length > 0) comp.unlockedTech.push(available[Math.floor(Math.random() * available.length)].id)
         }
 
-        // 2. Model Evolution
-        if (Math.random() > 0.96) {
-           const baseModel = comp.models[0]
-           const newModel = {
-             ...baseModel, id: `${baseModel.id}-${Date.now()}`, name: `${baseModel.name} ${year}`,
-             price: Math.floor(baseModel.price * 1.08), cost: Math.floor(baseModel.cost * 1.04),
-             stats: { ...baseModel.stats, power: baseModel.stats.power + 5, economy: baseModel.stats.economy + 1 }
-           }
-           comp.models.unshift(newModel)
-           if (comp.models.length > 3) comp.models.pop()
+        // 2. Model Evolution (Launch updated era-scaled models every ~3-4 years or when outdated)
+        const latestModel = comp.models[0]
+        const modelAge = year - (latestModel?.introduced || 1900)
+        if ((modelAge >= 4 && Math.random() < 0.25) || Math.random() < 0.03) {
+          const preferred = comp.personality.segment === 'Balanced'
+            ? validSegments[Math.floor(Math.random() * validSegments.length)]
+            : comp.personality.segment
+          const targetClass = validSegments.includes(preferred) ? preferred : (validSegments[0] || 'Utility')
+          const template = RIVAL_POOL.find(r => r.id === comp.id)?.startingModels[0] || latestModel
+          const newModel = buildEraScaledModel(template, year, targetClass)
+          comp.models.unshift(newModel)
+          if (comp.models.length > 2) comp.models.pop()
         }
 
-        // 3. Worker Management
-        if (comp.funds > 20000 && Math.random() > 0.8) {
-          comp.factories.forEach(f => { f.employees = Math.min(1000, Math.floor(f.employees * 1.05)) })
+        // 3. Adaptive Worker & Capacity Management
+        const reserveThreshold = 40000 * worldStore.inflationMultiplier
+        if (comp.funds > reserveThreshold && comp.lastTurnLedger.net > 0 && Math.random() < 0.2) {
+          comp.factories.forEach(f => { f.employees = Math.min(800, Math.floor(f.employees * 1.05)) })
+        } else if (comp.lastTurnLedger.net < 0 && comp.factories[0].employees > 60) {
+          // Trim workforce when losing money so rivals don't spiral into immediate bankruptcy
+          comp.factories.forEach(f => { f.employees = Math.max(60, Math.floor(f.employees * 0.9)) })
         }
 
-        // 4. Global Expansion & Showrooms
+        // 4. Reputation Recovery / Growth
+        if (comp.reputation < 65 && Math.random() < 0.3) {
+          comp.reputation = Math.min(85, comp.reputation + 0.5)
+        }
+
+        // 5. Global Expansion & Showrooms
         this.processAIEconomics(comp)
       })
     },
 
     processAIEconomics(comp) {
       const worldStore = useWorldStore()
-      
-      // Expansion Chance
-      if (comp.funds > 100000 && Math.random() > 0.95) {
-        const available = worldStore.territories.filter(t => !comp.unlockedTerritories.includes(t.id))
-        if (available.length > 0) {
-          const target = available[Math.floor(Math.random() * available.length)]
-          if (comp.funds >= target.unlockCost) {
-            comp.funds -= target.unlockCost
-            comp.unlockedTerritories.push(target.id)
-            comp.regionalShowrooms[target.id] = 1
-          }
-        }
+
+      // Automatically enter any newly unlocked active territories if the rival has funds
+      const activeTerritories = worldStore.territories.filter(t => t.active && !comp.unlockedTerritories.includes(t.id))
+      if (activeTerritories.length > 0 && comp.funds > 40000 * worldStore.inflationMultiplier && Math.random() < 0.25) {
+        const target = activeTerritories[Math.floor(Math.random() * activeTerritories.length)]
+        comp.unlockedTerritories.push(target.id)
+        comp.regionalShowrooms[target.id] = 1
       }
 
-      // Showroom Chance (Build presence in existing territories)
-      if (comp.funds > 30000 && Math.random() > 0.9) {
-        const tId = comp.unlockedTerritories[Math.floor(Math.random() * comp.unlockedTerritories.length)]
-        const current = comp.regionalShowrooms[tId] || 0
-        if (current < 5) {
-          const cost = Math.round(10000 * worldStore.inflationMultiplier)
-          if (comp.funds >= cost) {
-            comp.funds -= cost
-            comp.regionalShowrooms[tId] = current + 1
+      // Showroom Chance (Build presence in active territories)
+      if (comp.funds > 35000 * worldStore.inflationMultiplier && Math.random() < 0.12) {
+        const activeUnlocked = comp.unlockedTerritories.filter(tId =>
+          worldStore.territories.find(t => t.id === tId)?.active
+        )
+        if (activeUnlocked.length > 0) {
+          const tId = activeUnlocked[Math.floor(Math.random() * activeUnlocked.length)]
+          const current = comp.regionalShowrooms[tId] || 0
+          if (current < 6) {
+            const cost = Math.round(10000 * worldStore.inflationMultiplier)
+            if (comp.funds >= cost) {
+              comp.funds -= cost
+              comp.regionalShowrooms[tId] = current + 1
+            }
           }
         }
       }
@@ -208,26 +354,36 @@ export const useCompetitorStore = defineStore('competitors', {
     },
 
     processMonthlyFinances(compDataMap) {
+      const worldStore = useWorldStore()
       this.competitors.forEach(comp => {
         const data = compDataMap[comp.id] || { income: 0, productionCosts: 0, shipping: 0, salaries: 0, maintenance: 0, lease: 0, research: 0 }
-        
-        // Showroom lease costs for AI
+
         const totalShowrooms = Object.values(comp.regionalShowrooms).reduce((a, b) => a + b, 0)
         const leaseCost = (data.lease || 0) + (totalShowrooms * 500)
 
         const totalExpenses = data.productionCosts + (data.shipping || 0) + (data.salaries || 0) + (data.maintenance || 0) + leaseCost + (data.research || 0)
         const net = data.income - totalExpenses
         comp.funds += net
-        
-        comp.lastTurnLedger = { 
+
+        comp.lastTurnLedger = {
           income: data.income, productionCosts: data.productionCosts, shipping: data.shipping || 0,
           salaries: data.salaries || 0, maintenance: data.maintenance || 0, lease: leaseCost,
-          research: data.research || 0, net 
+          research: data.research || 0, net
         }
 
-        if (comp.funds < 0) {
+        // Restructure / emergency credit line once before becoming distressed, requiring 6 consecutive months of deep insolvency
+        const insolvencyFloor = -25000 * worldStore.inflationMultiplier
+        if (comp.funds < insolvencyFloor) {
           this.insolventMonths[comp.id] = (this.insolventMonths[comp.id] || 0) + 1
-          if (this.insolventMonths[comp.id] >= 3) comp.status = 'distressed'
+          if (this.insolventMonths[comp.id] === 4 && !comp.restructured) {
+            // Emergency bond issuance / restructuring
+            comp.funds += Math.round(75000 * worldStore.inflationMultiplier)
+            comp.restructured = true
+            this.insolventMonths[comp.id] = 0
+            comp.status = 'normal'
+          } else if (this.insolventMonths[comp.id] >= 6) {
+            comp.status = 'distressed'
+          }
         } else {
           this.insolventMonths[comp.id] = 0
           comp.status = 'normal'
