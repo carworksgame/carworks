@@ -1,5 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { useWorldStore } from './world'
+import { useDesignStore } from './design'
 
 export const useMarketingStore = defineStore('marketing', {
   state: () => ({
@@ -32,24 +33,32 @@ export const useMarketingStore = defineStore('marketing', {
 
   getters: {
     totalMonthlyMarketingCost: (state) => {
+      const designStore = useDesignStore()
+      const activeIds = new Set(designStore.activeModels.map(m => String(m.id)))
       let total = 0
       Object.values(state.activeRegionalCampaigns).forEach(territoryModels => {
-        Object.values(territoryModels).forEach(modelBudgets => {
-          Object.values(modelBudgets).forEach(amount => {
-            total += (amount || 0)
-          })
+        Object.entries(territoryModels).forEach(([modelId, modelBudgets]) => {
+          if (activeIds.has(String(modelId))) {
+            Object.values(modelBudgets).forEach(amount => {
+              total += (amount || 0)
+            })
+          }
         })
       })
       return total
     },
 
     getTerritoryMarketingCost: (state) => (territoryId) => {
+      const designStore = useDesignStore()
+      const activeIds = new Set(designStore.activeModels.map(m => String(m.id)))
       const territoryModels = state.activeRegionalCampaigns[territoryId] || {}
       let total = 0
-      Object.values(territoryModels).forEach(modelBudgets => {
-        Object.values(modelBudgets).forEach(amount => {
-          total += (amount || 0)
-        })
+      Object.entries(territoryModels).forEach(([modelId, modelBudgets]) => {
+        if (activeIds.has(String(modelId))) {
+          Object.values(modelBudgets).forEach(amount => {
+            total += (amount || 0)
+          })
+        }
       })
       return total
     },
@@ -98,6 +107,14 @@ export const useMarketingStore = defineStore('marketing', {
       } else {
         this.activeRegionalCampaigns[territoryId][modelId][mediaTypeId] = amount
       }
+    },
+
+    clearCampaignsForModel(modelId) {
+      Object.keys(this.activeRegionalCampaigns).forEach(territoryId => {
+        if (this.activeRegionalCampaigns[territoryId]?.[modelId]) {
+          delete this.activeRegionalCampaigns[territoryId][modelId]
+        }
+      })
     },
 
     processMonthlyBrandGrowth() {

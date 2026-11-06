@@ -116,6 +116,15 @@ export const usePlayerStore = defineStore('player', {
       this.recalculateIdleWorkers()
     },
 
+    clearModelAssignments(modelId) {
+      Object.keys(this.factoryAssignments).forEach(fId => {
+        if (this.factoryAssignments[fId] && modelId in this.factoryAssignments[fId]) {
+          delete this.factoryAssignments[fId][modelId]
+        }
+      })
+      this.recalculateIdleWorkers()
+    },
+
     updateRegionalPrice(tId, mId, price) {
       if (!this.regionalDistribution[tId]) this.regionalDistribution[tId] = {}
       if (!this.regionalDistribution[tId][mId]) this.regionalDistribution[tId][mId] = { price: 1000, priorities: [] }
@@ -286,11 +295,22 @@ export const usePlayerStore = defineStore('player', {
     clearReports() { this.purchasedReports = {} },
 
     recalculateIdleWorkers() {
-      this.factories.forEach(f => {
-        let assigned = 0
-        const assignments = this.factoryAssignments[f.id] || {}
-        Object.values(assignments).forEach(w => { assigned += w })
-        f.idleWorkers = Math.max(0, f.totalWorkers - assigned)
+      import('./design').then(dm => {
+        const designStore = dm.useDesignStore()
+        const activeIds = new Set(designStore.activeModels.map(m => String(m.id)))
+
+        this.factories.forEach(f => {
+          let assigned = 0
+          const assignments = this.factoryAssignments[f.id] || {}
+          Object.entries(assignments).forEach(([mId, w]) => {
+            if (activeIds.has(String(mId))) {
+              assigned += w
+            } else {
+              delete this.factoryAssignments[f.id][mId]
+            }
+          })
+          f.idleWorkers = Math.max(0, f.totalWorkers - assigned)
+        })
       })
 
       import('./research').then(m => {

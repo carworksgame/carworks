@@ -141,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useWorldStore } from '../stores/world'
 import { usePlayerStore } from '../stores/player'
 import { useDesignStore } from '../stores/design'
@@ -152,6 +152,12 @@ const designStore = useDesignStore()
 
 const viewTab = ref('production')
 const selectedModelId = ref(designStore.activeModels[0]?.id || null)
+
+watch(() => designStore.activeModels, (models) => {
+  if (!models.some(m => m.id === selectedModelId.value)) {
+    selectedModelId.value = models[0]?.id || null
+  }
+}, { deep: true })
 
 const factoryOptions = computed(() => {
   return playerStore.factories.map(f => ({
@@ -175,7 +181,10 @@ function setAssignment(fId, mId, val) {
 
 function getFactoryAssigned(fId) {
   const assignments = playerStore.factoryAssignments[fId] || {}
-  return Object.values(assignments).reduce((a, b) => a + b, 0)
+  const activeIds = new Set(designStore.activeModels.map(m => String(m.id)))
+  return Object.entries(assignments).reduce((acc, [mId, workers]) => {
+    return activeIds.has(String(mId)) ? acc + workers : acc
+  }, 0)
 }
 
 function getLoadColor(f) {

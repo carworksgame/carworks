@@ -2,6 +2,7 @@ import { defineStore, acceptHMRUpdate } from 'pinia'
 import { usePlayerStore } from './player'
 import { useGameStore } from './game'
 import { useWorldStore } from './world'
+import { useMarketingStore } from './marketing'
 
 export const VEHICLE_CLASSES = {
   ECONOMY: 'Economy',
@@ -190,6 +191,16 @@ export const useDesignStore = defineStore('design', {
       const model = this.models.find(m => m.id === modelId)
       if (model) {
         model.archived = true
+        const playerStore = usePlayerStore()
+        const marketingStore = useMarketingStore()
+        const worldStore = useWorldStore()
+
+        playerStore.clearModelAssignments(modelId)
+        marketingStore.clearCampaignsForModel(modelId)
+
+        if (worldStore.participatingModelId === modelId) {
+          worldStore.participatingModelId = null
+        }
       }
     },
 
