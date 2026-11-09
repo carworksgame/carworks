@@ -27,6 +27,15 @@ export const useReportsStore = defineStore('reports', {
     setLastTurnData(data) {
       this.lastTurn = data
     },
+    removeModelFromReport(modelName) {
+      if (this.lastTurn.incomeByModel?.[modelName] !== undefined) {
+        delete this.lastTurn.incomeByModel[modelName]
+      }
+      if (this.lastTurn.modelReport?.[modelName] !== undefined) {
+        delete this.lastTurn.modelReport[modelName]
+      }
+    },
+
     clearReports() {
         this.history = []
         this.lastTurn = {

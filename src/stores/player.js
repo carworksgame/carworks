@@ -51,8 +51,9 @@ export const usePlayerStore = defineStore('player', {
     },
 
     monthlyLeaseBill: (state) => {
+      const worldStore = useWorldStore()
       const totalShowrooms = Object.values(state.regionalShowrooms).reduce((a, b) => a + b, 0)
-      return totalShowrooms * 500
+      return Math.round(totalShowrooms * 600 * worldStore.inflationMultiplier)
     },
 
     lastMonthPerformance: (state) => state.ledger.length > 0 ? state.ledger[state.ledger.length - 1] : null,
@@ -95,8 +96,9 @@ export const usePlayerStore = defineStore('player', {
     },
 
     getUpgradeCost: () => (currentLevel) => {
-      const costs = { 1: 50000, 2: 125000, 3: 300000, 4: 750000 }
-      return costs[currentLevel] || 0
+      const worldStore = useWorldStore()
+      const costs = { 1: 40000, 2: 95000, 3: 220000, 4: 500000 }
+      return Math.round((costs[currentLevel] || 0) * worldStore.inflationMultiplier)
     }
   },
 
@@ -122,6 +124,9 @@ export const usePlayerStore = defineStore('player', {
           delete this.factoryAssignments[fId][modelId]
         }
       })
+      if (this.inventory[modelId]) {
+        delete this.inventory[modelId]
+      }
       this.recalculateIdleWorkers()
     },
 
@@ -145,9 +150,13 @@ export const usePlayerStore = defineStore('player', {
     },
 
     processMonthlyFinances(turnInfo) {
+      const worldStore = useWorldStore()
+      const maintenanceCost = this.factories.reduce((acc, f) => {
+        return acc + Math.round((1200 + (f.level - 1) * 600) * worldStore.inflationMultiplier)
+      }, 0)
       const expenses = {
-        salaries: this.monthlySalaryBill,
-        maintenance: this.factories.length * 1000,
+        salaries: Math.round(this.monthlySalaryBill),
+        maintenance: maintenanceCost,
         lease: this.monthlyLeaseBill,
         marketing: turnInfo.marketingCost || 0,
         research: turnInfo.researchCost || 0,
@@ -209,12 +218,14 @@ export const usePlayerStore = defineStore('player', {
     },
 
     buildFactory(territoryId, locationName) {
-      const cost = 25000
+      const worldStore = useWorldStore()
+      const cost = Math.round(30000 * worldStore.inflationMultiplier)
       if (this.funds >= cost) {
         this.funds -= cost
+        const territory = worldStore.territories.find(t => t.id === territoryId)
         this.factories.push({
           id: Date.now(), territory: territoryId, size: 1, level: 1,
-          totalWorkers: 50, idleWorkers: 50, salary: 50, maxEmployees: 500, location: locationName
+          totalWorkers: 50, idleWorkers: 50, salary: territory?.baseWage || 50, maxEmployees: 500, location: locationName
         })
         return true
       }

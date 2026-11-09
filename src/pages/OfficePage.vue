@@ -546,7 +546,7 @@
 
     <!-- Dialogs -->
     <q-dialog v-model="confirmReset"><q-card><q-card-section class="row items-center"><q-avatar icon="warning" color="red" text-color="white" /><span class="q-ml-sm">Are you sure you want to LIQUIDATE? This will permanently delete your cloud save.</span></q-card-section><q-card-actions align="right"><q-btn flat label="Cancel" color="primary" v-close-popup /><q-btn flat label="Confirm Liquidation" color="red" @click="resetGame" v-close-popup /></q-card-actions></q-card></q-dialog>
-    <q-dialog v-model="showFactoryDialog"><q-card style="min-width: 350px"><q-card-section><div class="text-h6">New Factory in {{ selectedTerritory?.name }}</div><div class="text-subtitle2 text-grey-7">Cost: $25,000</div></q-card-section><q-card-section class="q-pt-none"><q-input dense v-model="factoryLocationName" label="Location Name" autofocus @keyup.enter="buildFactory" /></q-card-section><q-card-actions align="right" class="text-primary"><q-btn flat label="Cancel" v-close-popup /><q-btn flat label="Build" @click="buildFactory" :disabled="!factoryLocationName" /></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="showFactoryDialog"><q-card style="min-width: 350px"><q-card-section><div class="text-h6">New Factory in {{ selectedTerritory?.name }}</div><div class="text-subtitle2 text-grey-7">Cost: ${{ Math.round(30000 * worldStore.inflationMultiplier).toLocaleString() }}</div></q-card-section><q-card-section class="q-pt-none"><q-input dense v-model="factoryLocationName" label="Location Name" autofocus @keyup.enter="buildFactory" /></q-card-section><q-card-actions align="right" class="text-primary"><q-btn flat label="Cancel" v-close-popup /><q-btn flat label="Build" @click="buildFactory" :disabled="!factoryLocationName" /></q-card-actions></q-card></q-dialog>
   </q-page>
 </template>
 
@@ -804,9 +804,9 @@ function handleAcquisition(comp) {
         // Initialize assignments object
         playerStore.factoryAssignments[newFactoryId] = {}
 
-        // Auto-assign production for the player's primary model if one exists
-        if (designStore.models.length > 0) {
-          const mainModel = designStore.models[0]
+        // Auto-assign production for the player's primary active model if one exists
+        if (designStore.activeModels.length > 0) {
+          const mainModel = designStore.activeModels[0]
           playerStore.updateFactoryAssignment(newFactoryId, mainModel.id, f.employees)
           
           // Set as primary supplier for its own territory

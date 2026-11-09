@@ -98,30 +98,31 @@ function buildEraScaledModel(baseModel, year, targetSegment) {
   const vehicleClass = targetSegment || baseModel.vehicleClass || 'Utility'
 
   const baseCostByClass = {
-    Economy: 310 + Math.round(decadeProgress * 45),
-    Utility: 380 + Math.round(decadeProgress * 55),
-    Sport: 490 + Math.round(decadeProgress * 75),
-    Luxury: 640 + Math.round(decadeProgress * 95)
+    Economy: 300 + Math.round(decadeProgress * 45),
+    Utility: 360 + Math.round(decadeProgress * 55),
+    Sport: 470 + Math.round(decadeProgress * 75),
+    Luxury: 610 + Math.round(decadeProgress * 95)
   }
-  const cost = baseCostByClass[vehicleClass] || 400
-  const marginByClass = { Economy: 1.75, Utility: 1.85, Sport: 2.1, Luxury: 2.35 }
-  const price = Math.round(cost * (marginByClass[vehicleClass] || 1.85))
+  const cost = baseCostByClass[vehicleClass] || 380
+  // Competitive pricing: AI prices slightly more aggressively to fight for market share
+  const marginByClass = { Economy: 1.55, Utility: 1.65, Sport: 1.9, Luxury: 2.15 }
+  const price = Math.round(cost * (marginByClass[vehicleClass] || 1.65))
 
   return {
     ...baseModel,
     id: `${baseModel.id}-${year}`,
-    name: yearsElapsed > 5 ? `${baseModel.name} '${String(year).slice(-2)}` : baseModel.name,
+    name: yearsElapsed > 3 ? `${baseModel.name} '${String(year).slice(-2)}` : baseModel.name,
     vehicleClass,
     introduced: year,
     cost,
     price,
     stats: {
-      pwrRatio: Math.round((baseModel.stats.pwrRatio || 12) + decadeProgress * (vehicleClass === 'Sport' ? 8 : 4.5)),
-      safety: Math.min(98, Math.round((baseModel.stats.safety || 10) + decadeProgress * 7)),
-      power: Math.round((baseModel.stats.power || 20) + decadeProgress * (vehicleClass === 'Sport' ? 28 : 18)),
-      economy: Math.round((baseModel.stats.economy || 12) + decadeProgress * (vehicleClass === 'Economy' ? 3.5 : 2)),
-      appeal: Math.round((baseModel.stats.appeal || 10) + decadeProgress * (vehicleClass === 'Luxury' ? 12 : 7)),
-      durability: Math.min(95, Math.round((baseModel.stats.durability || 30) + decadeProgress * 5.5))
+      pwrRatio: Math.round((baseModel.stats.pwrRatio || 14) + decadeProgress * (vehicleClass === 'Sport' ? 9.5 : 5.5)),
+      safety: Math.min(98, Math.round((baseModel.stats.safety || 12) + decadeProgress * 8)),
+      power: Math.round((baseModel.stats.power || 22) + decadeProgress * (vehicleClass === 'Sport' ? 32 : 20)),
+      economy: Math.round((baseModel.stats.economy || 14) + decadeProgress * (vehicleClass === 'Economy' ? 4.2 : 2.5)),
+      appeal: Math.round((baseModel.stats.appeal || 12) + decadeProgress * (vehicleClass === 'Luxury' ? 14 : 8.5)),
+      durability: Math.min(95, Math.round((baseModel.stats.durability || 35) + decadeProgress * 6.5))
     }
   }
 }
@@ -273,24 +274,39 @@ export const useCompetitorStore = defineStore('competitors', {
           if (available.length > 0) comp.unlockedTech.push(available[Math.floor(Math.random() * available.length)].id)
         }
 
-        // 2. Model Evolution (Launch updated era-scaled models every ~3-4 years or when outdated)
+        // 2. Model Evolution: Ensure AI covers multiple active segments & updates models every ~3 years
         const latestModel = comp.models[0]
         const modelAge = year - (latestModel?.introduced || 1900)
-        if ((modelAge >= 4 && Math.random() < 0.25) || Math.random() < 0.03) {
+        if ((modelAge >= 3 && Math.random() < 0.35) || comp.models.length < Math.min(2, validSegments.length) || Math.random() < 0.04) {
+          // Pick a segment the rival isn't already covering, or their preferred segment
+          const coveredByComp = comp.models.map(m => m.vehicleClass)
+          const uncoveredSegment = validSegments.find(s => !coveredByComp.includes(s))
           const preferred = comp.personality.segment === 'Balanced'
             ? validSegments[Math.floor(Math.random() * validSegments.length)]
             : comp.personality.segment
-          const targetClass = validSegments.includes(preferred) ? preferred : (validSegments[0] || 'Utility')
+          const targetClass = uncoveredSegment || (validSegments.includes(preferred) ? preferred : (validSegments[0] || 'Utility'))
           const template = RIVAL_POOL.find(r => r.id === comp.id)?.startingModels[0] || latestModel
           const newModel = buildEraScaledModel(template, year, targetClass)
-          comp.models.unshift(newModel)
-          if (comp.models.length > 2) comp.models.pop()
+          // Replace existing model of same class or add up to 2 active models per rival
+          const existingIdx = comp.models.findIndex(m => m.vehicleClass === targetClass)
+          if (existingIdx !== -1) {
+            comp.models.splice(existingIdx, 1, newModel)
+          } else {
+            comp.models.unshift(newModel)
+            if (comp.models.length > 2) comp.models.pop()
+          }
         }
 
         // 3. Adaptive Worker & Capacity Management
-        const reserveThreshold = 40000 * worldStore.inflationMultiplier
-        if (comp.funds > reserveThreshold && comp.lastTurnLedger.net > 0 && Math.random() < 0.2) {
-          comp.factories.forEach(f => { f.employees = Math.min(800, Math.floor(f.employees * 1.05)) })
+        const reserveThreshold = 30000 * worldStore.inflationMultiplier
+        if (comp.funds > reserveThreshold && comp.lastTurnLedger.net > 0 && Math.random() < 0.3) {
+          comp.factories.forEach(f => {
+            f.employees = Math.min(1200, Math.floor(f.employees * 1.08))
+            if (f.level < 5 && comp.funds > 90000 * worldStore.inflationMultiplier && Math.random() < 0.15) {
+              f.level++
+              f.productivity = 1.0 + (f.level - 1) * 0.2
+            }
+          })
         } else if (comp.lastTurnLedger.net < 0 && comp.factories[0].employees > 60) {
           // Trim workforce when losing money so rivals don't spiral into immediate bankruptcy
           comp.factories.forEach(f => { f.employees = Math.max(60, Math.floor(f.employees * 0.9)) })

@@ -47,9 +47,9 @@ function computeModelDesirability(m, targetSegment, year, baseMarketPrice) {
 
   let stickerShock = 1.0
   if (m.price > affordabilityCap) {
-    // Gradual penalty when exceeding the segment's affordability ceiling
+    // Steep penalty when exceeding the segment's affordability ceiling
     const overRatio = (m.price - affordabilityCap) / (affordabilityCap || 1)
-    stickerShock = Math.max(0.001, Math.pow(0.15, overRatio * 2.5))
+    stickerShock = Math.max(0.0005, Math.pow(0.08, overRatio * 3.0))
     classMultiplier *= stickerShock
   }
 
@@ -61,10 +61,10 @@ function computeModelDesirability(m, targetSegment, year, baseMarketPrice) {
 
   // Segment-specific stat weights so advanced engines, chassis, safety, and aesthetic features shine
   const weightsBySegment = {
-    [VEHICLE_CLASSES.ECONOMY]: { perf: 1.0, econ: 2.8, safety: 0.5, appeal: 0.7, dur: 0.6, priceSensitivity: 1.25 },
-    [VEHICLE_CLASSES.UTILITY]: { perf: 1.3, econ: 1.2, safety: 0.6, appeal: 0.5, dur: 1.5, priceSensitivity: 0.95 },
-    [VEHICLE_CLASSES.SPORT]: { perf: 3.4, econ: 0.5, safety: 0.6, appeal: 1.4, dur: 0.5, priceSensitivity: 0.65 },
-    [VEHICLE_CLASSES.LUXURY]: { perf: 1.6, econ: 0.5, safety: 1.4, appeal: 2.4, dur: 0.8, priceSensitivity: 0.45 }
+    [VEHICLE_CLASSES.ECONOMY]: { perf: 1.0, econ: 2.8, safety: 0.6, appeal: 0.8, dur: 0.7, priceSensitivity: 1.5 },
+    [VEHICLE_CLASSES.UTILITY]: { perf: 1.4, econ: 1.2, safety: 0.7, appeal: 0.6, dur: 1.6, priceSensitivity: 1.15 },
+    [VEHICLE_CLASSES.SPORT]: { perf: 3.5, econ: 0.5, safety: 0.7, appeal: 1.5, dur: 0.6, priceSensitivity: 0.85 },
+    [VEHICLE_CLASSES.LUXURY]: { perf: 1.7, econ: 0.5, safety: 1.5, appeal: 2.5, dur: 0.9, priceSensitivity: 0.65 }
   }
   const w = weightsBySegment[targetSegment] || weightsBySegment[VEHICLE_CLASSES.UTILITY]
 
@@ -76,15 +76,15 @@ function computeModelDesirability(m, targetSegment, year, baseMarketPrice) {
     (durability * w.dur)
 
   // Era Expectations & Model Age Obsolescence:
-  // Consumers expect higher quality as decades advance, and designs older than 6 years gradually lose appeal
+  // Consumers expect higher quality as decades advance, and designs older than 3 years lose appeal
   const yearsSince1900 = Math.max(0, year - 1900)
-  const expectedMinQuality = 30 + (yearsSince1900 * 1.6)
+  const expectedMinQuality = 35 + (yearsSince1900 * 2.1)
   const eraStandardFactor = rawQuality < expectedMinQuality
-    ? Math.max(0.2, Math.pow(rawQuality / expectedMinQuality, 1.5))
-    : 1.0 + Math.min(0.6, (rawQuality - expectedMinQuality) / (expectedMinQuality * 2))
+    ? Math.max(0.12, Math.pow(rawQuality / expectedMinQuality, 2.0))
+    : 1.0 + Math.min(0.65, (rawQuality - expectedMinQuality) / (expectedMinQuality * 1.8))
 
   const modelAge = Math.max(0, year - (m.introduced || year))
-  const ageFactor = modelAge <= 5 ? 1.0 : Math.max(0.35, Math.pow(0.92, modelAge - 5))
+  const ageFactor = modelAge <= 3 ? 1.0 : Math.max(0.2, Math.pow(0.86, modelAge - 3))
 
   // Price sensitivity depends on segment (Luxury & Sport buyers tolerate higher prices for higher quality)
   const normalizedPrice = Math.max(0.35, m.price / (baseMarketPrice * 0.75))
@@ -215,48 +215,52 @@ export function processEndTurn(savesStore) {
     turnSnapshot.production[f.id] = { owner: 'Player', location: f.location, capacity: f.totalWorkers * productivity, actualOutput: factoryTotalOutput }
   })
 
-  // AI Production & Logistics (Only ship to active territories and throttle when inventory is full)
+  // AI Production & Logistics (Build across all active AI models and ship to active territories)
   const activeTerritoryIds = worldStore.territories.filter(t => t.active).map(t => t.id)
   competitorStore.competitors.forEach(comp => {
-    const compModel = comp.models[0]
     const factory = comp.factories[0]
     aiFinanceMap[comp.id].salaries += factory.employees * (factory.salary || 50)
-    aiFinanceMap[comp.id].maintenance += 500
+    aiFinanceMap[comp.id].maintenance += Math.round(800 * worldStore.inflationMultiplier)
 
-    // Determine active territories this competitor operates in (always including North America so they have an active market)
     const targetTerritories = activeTerritoryIds.filter(tId =>
       comp.unlockedTerritories?.includes(tId) || tId === 'north-america'
     )
     const destinationIds = targetTerritories.length > 0 ? targetTerritories : ['north-america']
 
-    // Check existing unsold stock across active territories to avoid bankrupting overproduction
-    const existingStock = destinationIds.reduce((sum, tId) => {
-      return sum + (comp.regionalInventory?.[compModel.id]?.[tId] || 0)
-    }, 0)
     const maxCapacity = Math.floor(factory.employees * factory.productivity)
-    const desiredStockBuffer = maxCapacity * 2
-    const utilization = existingStock >= desiredStockBuffer
-      ? 0.15
-      : Math.max(0.25, 1 - (existingStock / (desiredStockBuffer * 1.5)))
-
-    const totalProd = Math.floor(maxCapacity * utilization)
+    const modelCount = Math.max(1, comp.models.length)
+    const capacityPerModel = Math.floor(maxCapacity / modelCount)
     const unitCostDiscount = 1 - (((factory.level || 1) - 1) * 0.05)
-    aiFinanceMap[comp.id].productionCosts += totalProd * Math.round(compModel.cost * worldStore.inflationMultiplier * unitCostDiscount)
-    companyStats[comp.id].production = totalProd
 
-    const amountPerTerritory = Math.floor(totalProd / destinationIds.length)
-    const remainder = totalProd - (amountPerTerritory * destinationIds.length)
-    destinationIds.forEach((tId, idx) => {
-      const unitsToShip = amountPerTerritory + (idx === 0 ? remainder : 0)
-      if (unitsToShip > 0) {
-        competitorStore.addToInventory(comp.id, compModel.id, tId, unitsToShip)
-        const originTerritory = factory.territory || comp.homeTerritory
-        if (tId !== originTerritory) {
-          const shipRate = worldStore.getShippingCost(originTerritory, tId)
-          aiFinanceMap[comp.id].shipping += unitsToShip * shipRate
+    let compTotalProd = 0
+    comp.models.forEach(compModel => {
+      const existingStock = destinationIds.reduce((sum, tId) => {
+        return sum + (comp.regionalInventory?.[compModel.id]?.[tId] || 0)
+      }, 0)
+      const desiredStockBuffer = capacityPerModel * 2
+      const utilization = existingStock >= desiredStockBuffer
+        ? 0.15
+        : Math.max(0.3, 1 - (existingStock / (desiredStockBuffer * 1.5)))
+
+      const modelProd = Math.floor(capacityPerModel * utilization)
+      compTotalProd += modelProd
+      aiFinanceMap[comp.id].productionCosts += modelProd * Math.round(compModel.cost * worldStore.inflationMultiplier * unitCostDiscount)
+
+      const amountPerTerritory = Math.floor(modelProd / destinationIds.length)
+      const remainder = modelProd - (amountPerTerritory * destinationIds.length)
+      destinationIds.forEach((tId, idx) => {
+        const unitsToShip = amountPerTerritory + (idx === 0 ? remainder : 0)
+        if (unitsToShip > 0) {
+          competitorStore.addToInventory(comp.id, compModel.id, tId, unitsToShip)
+          const originTerritory = factory.territory || comp.homeTerritory
+          if (tId !== originTerritory) {
+            const shipRate = worldStore.getShippingCost(originTerritory, tId)
+            aiFinanceMap[comp.id].shipping += unitsToShip * shipRate
+          }
         }
-      }
+      })
     })
+    companyStats[comp.id].production = compTotalProd
   })
 
   // 4. DISTRIBUTION & SALES
@@ -407,9 +411,11 @@ export function processEndTurn(savesStore) {
       })
 
       const totalDesirability = availableModels.reduce((acc, m) => acc + m.desirability, 0)
+      // Market saturation / minimum quality floor: if total desirability in the segment is low, not all potential buyers purchase a car
+      const marketCaptureRatio = Math.min(1.0, totalDesirability / (85 + Math.max(0, gameStore.year - 1900) * 1.2))
       availableModels.forEach(m => {
         const shareOfPool = m.desirability / (totalDesirability || 1)
-        const salesPotential = segmentDemand * shareOfPool
+        const salesPotential = segmentDemand * marketCaptureRatio * shareOfPool
         let actualSales = Math.min(m.inventory, Math.floor(salesPotential * (0.85 + Math.random() * 0.3)))
         if (isNaN(actualSales)) actualSales = 0
         companyStats[m.ownerId].sales += actualSales
@@ -436,9 +442,32 @@ export function processEndTurn(savesStore) {
     })
   })
 
+  // 6. QUALITY & RELIABILITY CHECKS (Low durability or untested safety/braking can trigger recall alerts)
+  designStore.activeModels.forEach(m => {
+    const durability = m.stats.durability || 30
+    const safety = m.stats.realSafety || m.stats.safety || 10
+    const defectRisk = Math.max(0.005, (90 - durability) / 1400)
+    const alreadyHasIssue = designStore.activeIssues.some(i => i.modelName === m.name)
+    if (!alreadyHasIssue && Math.random() < defectRisk) {
+      const soldRegions = Object.keys(lastTurnData.modelReport[m.name] || {})
+      const regionName = soldRegions[0] || 'North America'
+      const issueTypes = safety < 35
+        ? ['Brake Failure Reports', 'Steering Linkage Defect', 'Fuel Line Fire Hazard']
+        : ['Premature Chassis Fatigue', 'Transmission Gear Wear', 'Electrical System Short']
+      const issueType = issueTypes[Math.floor(Math.random() * issueTypes.length)]
+      const fixCost = Math.round(6000 * worldStore.inflationMultiplier + (m.cost * 8))
+      designStore.addIssue({
+        type: issueType,
+        modelName: m.name,
+        territoryName: regionName,
+        costToFix: fixCost
+      })
+    }
+  })
+
   // Final Reports & Finances
   Object.keys(lastTurnData.modelReport).forEach(mName => {
-    const model = designStore.models.find(m => m.name === mName)
+    const model = designStore.activeModels.find(m => m.name === mName)
     if (model) {
       Object.keys(lastTurnData.modelReport[mName]).forEach(tName => {
         const territory = worldStore.territories.find(t => t.name === tName)

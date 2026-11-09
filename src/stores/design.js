@@ -3,6 +3,7 @@ import { usePlayerStore } from './player'
 import { useGameStore } from './game'
 import { useWorldStore } from './world'
 import { useMarketingStore } from './marketing'
+import { useReportsStore } from './reports'
 
 export const VEHICLE_CLASSES = {
   ECONOMY: 'Economy',
@@ -190,7 +191,11 @@ export const useDesignStore = defineStore('design', {
         archived: false
       }
 
-      this.models.push(newModel)
+        // Ensure unique model names so reports don't collide with archived models
+        if (this.models.some(m => m.name === newModel.name)) {
+          newModel.name = `${newModel.name} (${gameStore.year})`
+        }
+        this.models.push(newModel)
 
       // INITIALIZE LOGISTICS for the new model across all active territories
       const suggestedRetail = Math.round(currentCost * 1.85)
@@ -212,9 +217,11 @@ export const useDesignStore = defineStore('design', {
         const playerStore = usePlayerStore()
         const marketingStore = useMarketingStore()
         const worldStore = useWorldStore()
+        const reportsStore = useReportsStore()
 
         playerStore.clearModelAssignments(modelId)
         marketingStore.clearCampaignsForModel(modelId)
+        reportsStore.removeModelFromReport(model.name)
 
         if (worldStore.participatingModelId === modelId) {
           worldStore.participatingModelId = null
